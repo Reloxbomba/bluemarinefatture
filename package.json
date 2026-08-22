@@ -9,7 +9,7 @@
     "setup": "node setup.js"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
     "pg": "^8.13.1",
