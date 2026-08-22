@@ -37,10 +37,10 @@ const requireAdmin = (req, res, next) => {
 
 // ─── Product Catalog ──────────────────────────────────────────────
 const PRODUCTS = {
-  A: { id: 'A', name: 'Categoria A', format: 'NxN',    prices: {1:600,2:1200,3:1800,4:2400,5:3000,6:3600,7:4200,8:4800,9:5400,10:6000} },
-  B: { id: 'B', name: 'Categoria B', format: 'N',      prices: {1:350,2:700,3:1050,4:1400,5:1750,6:2100,7:2450,8:2800,9:3150,10:3500} },
-  C: { id: 'C', name: 'Categoria C', format: 'NxNxN',  prices: {1:950,2:1900,3:2850,4:3800,5:4750,6:5700,7:6650,8:7600,9:8550,10:9500} },
-  D: { id: 'D', name: 'Categoria D', format: 'custom', prices: null } // quantità e prezzo liberi
+  A: { id: 'A', name: 'Combo cibo', format: 'NxN',    prices: {1:600,2:1200,3:1800,4:2400,5:3000,6:3600,7:4200,8:4800,9:5400,10:6000} },
+  B: { id: 'B', name: 'Antistress singolo', format: 'N',      prices: {1:350,2:700,3:1050,4:1400,5:1750,6:2100,7:2450,8:2800,9:3150,10:3500} },
+  C: { id: 'C', name: 'Combo cibo antistress', format: 'NxNxN',  prices: {1:950,2:1900,3:2850,4:3800,5:4750,6:5700,7:6650,8:7600,9:8550,10:9500} },
+  D: { id: 'D', name: 'Personalizzata', format: 'custom', prices: null } // quantità e prezzo liberi
 };
 
 // ══════════════════════════════════════════════════════════════════
@@ -83,7 +83,9 @@ app.get('/api/products', requireAuth, (req, res) => res.json(PRODUCTS));
 app.post('/api/invoices', requireAuth, async (req, res) => {
   const { clientName, productType, quantity, notes, manualPrice } = req.body;
   const product = PRODUCTS[productType];
-  const qty     = parseInt(quantity);
+  const qty = productType === 'D'
+    ? String(quantity ?? '').trim()
+    : parseInt(quantity, 10);
 
   if (!product) return res.status(400).json({ error: 'Prodotto non valido' });
 
@@ -91,8 +93,8 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
 
   if (productType === 'D') {
     // Categoria D: quantità e prezzo liberi
-    if (!qty || qty < 1 || qty > 99999)
-      return res.status(400).json({ error: 'Quantità non valida (1-99999)' });
+    if (!qty || qty.length > 100)
+      return res.status(400).json({ error: 'Quantità non valida (1-100 caratteri)' });
     const pMan = parseFloat(manualPrice);
     if (isNaN(pMan) || pMan <= 0)
       return res.status(400).json({ error: 'Prezzo non valido' });
@@ -276,7 +278,7 @@ app.get('/api/export/csv', requireAdmin, async (req, res) => {
 
   const header = ['ID','Dipendente','Cliente','Prodotto','Quantità','Prezzo ($)','Note','Data e Ora'];
   const rows   = invoices.map(i => [
-    esc(i.id), esc(i.employeeName), esc(i.clientName), esc(i.productName),
+    esc(i.id), esc(i.employeeName), esc(i.clientName), esc(PRODUCTS[i.productType]?.name || i.productName),
     esc(i.quantity), esc(i.price), esc(i.notes),
     esc(new Date(i.createdAt).toLocaleString('it-IT'))
   ]);

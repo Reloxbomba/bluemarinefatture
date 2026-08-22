@@ -29,7 +29,12 @@ function toast(msg, type = 'info') {
 }
 
 const QTY_FMT = { A: (n)=>`${n}×${n}`, B: (n)=>`${n}`, C: (n)=>`${n}×${n}×${n}` };
-const PROD_NAMES = { A:'Categoria A', B:'Categoria B', C:'Categoria C' };
+const PROD_NAMES = {
+  A: 'Combo cibo',
+  B: 'Antistress singolo',
+  C: 'Combo cibo antistress',
+  D: 'Personalizzata'
+};
 
 function qtyPill(type, qty)  { return `<span class="qty-pill">${(QTY_FMT[type]??((n)=>n))(qty)}</span>`; }
 function prodBadge(type)     { return `<span class="badge badge-${type}">${PROD_NAMES[type]||type}</span>`; }

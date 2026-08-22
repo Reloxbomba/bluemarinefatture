@@ -3,22 +3,22 @@
 // ─── Product catalog (mirrors server) ────────────────────────────
 const PRODUCTS = {
   A: {
-    name: 'Categoria A',
+    name: 'Combo cibo',
     fmt:  (n) => `${n}×${n}`,
     prices: {1:600,2:1200,3:1800,4:2400,5:3000,6:3600,7:4200,8:4800,9:5400,10:6000}
   },
   B: {
-    name: 'Categoria B',
+    name: 'Antistress singolo',
     fmt:  (n) => `${n}`,
     prices: {1:350,2:700,3:1050,4:1400,5:1750,6:2100,7:2450,8:2800,9:3150,10:3500}
   },
   C: {
-    name: 'Categoria C',
+    name: 'Combo cibo antistress',
     fmt:  (n) => `${n}×${n}×${n}`,
     prices: {1:950,2:1900,3:2850,4:3800,5:4750,6:5700,7:6650,8:7600,9:8550,10:9500}
   },
   D: {
-    name: 'Categoria D',
+    name: 'Personalizzata',
     fmt:  (n) => `${n}`,
     prices: null  // manuale
   }
@@ -193,9 +193,9 @@ invoiceForm.addEventListener('submit', async (e) => {
   let quantity, manualPrice;
 
   if (productType === 'D') {
-    quantity = parseInt(manualQtyInp.value);
+    quantity = manualQtyInp.value.trim();
     manualPrice = parseFloat(manualPriceInp.value);
-    if (!quantity || quantity < 1) { toast('Inserisci una quantità valida', 'error'); return; }
+    if (!quantity) { toast('Inserisci una quantità valida', 'error'); return; }
     if (isNaN(manualPrice) || manualPrice <= 0) { toast('Inserisci un prezzo valido', 'error'); return; }
   } else {
     quantity = selQty.value;
@@ -210,7 +210,7 @@ invoiceForm.addEventListener('submit', async (e) => {
     const body = {
       clientName:  document.getElementById('client-name').value.trim(),
       productType,
-      quantity:    parseInt(quantity),
+      quantity,
       notes:       document.getElementById('invoice-notes').value.trim()
     };
     if (productType === 'D') body.manualPrice = manualPrice;
