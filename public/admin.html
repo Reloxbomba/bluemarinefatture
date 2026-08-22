@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel – Blue Marine NOW</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body class="dashboard-page">
+
+  <!-- Page Loader -->
+  <div id="page-loader">
+    <div class="spinner" style="width:44px;height:44px;border-width:3px;"></div>
+    <p class="text-muted" style="font-size:0.85rem;">Caricamento...</p>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container"></div>
+
+  <!-- ══ MODAL: Aggiungi Utente ══════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-add-user">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-plus text-accent"></i>&nbsp; Aggiungi Utente</h3>
+        <button class="btn btn-ghost btn-icon" id="modal-add-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input type="text" id="new-username" class="form-control" placeholder="username (min. 3 caratteri)" minlength="3" maxlength="30" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="new-password" class="form-control" placeholder="password (min. 4 caratteri)" minlength="4" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ruolo</label>
+          <select id="new-role" class="form-control">
+            <option value="employee">👤 Dipendente</option>
+            <option value="admin">👑 Amministratore</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="modal-add-cancel">Annulla</button>
+        <button class="btn btn-primary" id="modal-add-confirm">
+          <i class="fa-solid fa-check"></i> Crea Utente
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Reset Password ═══════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-reset-pw">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-key text-accent"></i>&nbsp; Reset Password</h3>
+        <button class="btn btn-ghost btn-icon" id="modal-reset-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-2)">Nuova password per <strong id="reset-target-name">–</strong>:</p>
+        <div class="form-group">
+          <label class="form-label">Nuova Password</label>
+          <input type="password" id="reset-pw-input" class="form-control" placeholder="Nuova password (min. 4 caratteri)" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="modal-reset-cancel">Annulla</button>
+        <button class="btn btn-primary" id="modal-reset-confirm">
+          <i class="fa-solid fa-key"></i> Aggiorna Password
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Conferma Eliminazione ════════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-confirm-delete">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-trash text-danger"></i>&nbsp; Conferma Eliminazione</h3>
+        <button class="btn btn-ghost btn-icon" id="modal-del-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-2)">Sei sicuro di voler eliminare <strong id="delete-target-name">–</strong>? Questa azione è <span style="color:var(--danger)">irreversibile</span>.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="modal-del-cancel">Annulla</button>
+        <button class="btn btn-danger" id="modal-del-confirm">
+          <i class="fa-solid fa-trash"></i> Elimina
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ HEADER ═══════════════════════════════════════════════════ -->
+  <header class="page-header">
+    <div class="header-logo">
+      <span class="anchor">⚓</span>
+      Blue Marine <em>NOW</em>
+    </div>
+    <div class="header-right">
+      <div class="user-chip">
+        <div class="avatar admin" id="user-avatar">A</div>
+        <div>
+          <div class="user-chip-name" id="user-name">–</div>
+          <div class="badge badge-admin user-chip-role">👑 Admin</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logout-btn">
+        <i class="fa-solid fa-right-from-bracket"></i> Esci
+      </button>
+    </div>
+  </header>
+
+  <!-- ══ MAIN ══════════════════════════════════════════════════════ -->
+  <main class="page-main">
+
+    <div style="margin-bottom:1.5rem;">
+      <h1 style="font-size:1.4rem;margin-bottom:.2rem;">
+        <i class="fa-solid fa-shield-halved text-accent"></i>&nbsp; Pannello Amministratore
+      </h1>
+      <p class="text-muted">Gestisci fatture, dipendenti e accessi al sistema</p>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="overview">
+        <i class="fa-solid fa-chart-pie"></i> Panoramica
+      </button>
+      <button class="tab-btn" data-tab="invoices">
+        <i class="fa-solid fa-file-invoice-dollar"></i> Fatture
+      </button>
+      <button class="tab-btn" data-tab="employees">
+        <i class="fa-solid fa-users"></i> Dipendenti
+      </button>
+      <button class="tab-btn" data-tab="users">
+        <i class="fa-solid fa-user-gear"></i> Utenti
+      </button>
+    </div>
+
+    <!-- ─── TAB: Panoramica ─────────────────────────────────────── -->
+    <div class="tab-pane active" id="tab-overview">
+
+      <div class="stats-grid">
+        <div class="card stat-card c-accent fade-in stagger-1">
+          <div class="stat-icon text-accent"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+          <div class="stat-value text-accent" id="ov-total-inv">–</div>
+          <div class="stat-label">Fatture Totali</div>
+        </div>
+        <div class="card stat-card c-success fade-in stagger-2">
+          <div class="stat-icon text-success"><i class="fa-solid fa-sack-dollar"></i></div>
+          <div class="stat-value text-success" id="ov-total-amt">–</div>
+          <div class="stat-label">Totale Incassato</div>
+        </div>
+        <div class="card stat-card c-gold fade-in stagger-3">
+          <div class="stat-icon text-gold"><i class="fa-solid fa-calendar-day"></i></div>
+          <div class="stat-value text-gold" id="ov-today-inv">–</div>
+          <div class="stat-label">Fatture Oggi</div>
+        </div>
+        <div class="card stat-card c-warning fade-in stagger-4">
+          <div class="stat-icon" style="color:var(--warning)"><i class="fa-solid fa-coins"></i></div>
+          <div class="stat-value" style="color:var(--warning)" id="ov-today-amt">–</div>
+          <div class="stat-label">Incassato Oggi</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="card fade-in" style="animation-delay:.22s">
+          <div class="card-header"><h3>Fatture per Dipendente</h3></div>
+          <div class="card-body"><canvas id="chart-employees" height="210"></canvas></div>
+        </div>
+        <div class="card fade-in" style="animation-delay:.3s">
+          <div class="card-header"><h3>Distribuzione Prodotti</h3></div>
+          <div class="card-body"><canvas id="chart-products" height="210"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card fade-in" style="animation-delay:.38s;margin-top:1.5rem;">
+        <div class="card-header">
+          <h3>Ultime Fatture</h3>
+          <button class="btn btn-outline btn-sm" onclick="switchTab('invoices')">
+            Vedi tutte <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Data</th><th>Dipendente</th><th>Cliente</th><th>Prodotto</th><th>Qtà</th><th>Prezzo</th></tr>
+            </thead>
+            <tbody id="recent-body">
+              <tr><td colspan="6" class="text-center text-muted" style="padding:1.5rem">Caricamento...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TAB: Fatture ────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-invoices">
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-file-invoice-dollar text-accent"></i>&nbsp; Tutte le Fatture</h3>
+          <a href="/api/export/csv" class="btn btn-outline btn-sm" id="csv-btn" target="_blank">
+            <i class="fa-solid fa-file-csv"></i> Esporta CSV
+          </a>
+        </div>
+        <div class="card-body" style="padding-bottom:.5rem;">
+          <div class="filter-bar">
+            <select id="f-employee" class="form-control" style="max-width:200px;">
+              <option value="">Tutti i dipendenti</option>
+            </select>
+            <select id="f-product" class="form-control" style="max-width:175px;">
+              <option value="">Tutti i prodotti</option>
+              <option value="A">Categoria A</option>
+              <option value="B">Categoria B</option>
+              <option value="C">Categoria C</option>
+            </select>
+            <input type="date" id="f-from" class="form-control" style="max-width:175px;" />
+            <input type="date" id="f-to"   class="form-control" style="max-width:175px;" />
+            <button class="btn btn-primary btn-sm" id="btn-filter">
+              <i class="fa-solid fa-filter"></i> Filtra
+            </button>
+            <button class="btn btn-ghost btn-sm" id="btn-reset-filter">
+              <i class="fa-solid fa-rotate-left"></i>
+            </button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th><th>Dipendente</th><th>Cliente</th>
+                <th>Prodotto</th><th>Qtà</th><th>Prezzo</th><th>Note</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="all-inv-body">
+              <tr><td colspan="8" class="text-center text-muted" style="padding:1.5rem">Caricamento...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="inv-footer" style="padding:.85rem 1rem;color:var(--text-3);font-size:.82rem;border-top:1px solid var(--border);"></div>
+      </div>
+    </div>
+
+    <!-- ─── TAB: Dipendenti ─────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-employees">
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-users text-accent"></i>&nbsp; Statistiche Dipendenti</h3>
+          <button class="btn btn-ghost btn-sm" onclick="refreshAll()">
+            <i class="fa-solid fa-rotate-right"></i> Aggiorna
+          </button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Dipendente</th>
+                <th>Fatture Tot.</th>
+                <th>Incassato Tot.</th>
+                <th>% Guadagno</th>
+                <th>Da Pagare</th>
+                <th>Fatture Oggi</th>
+                <th>Incassato Oggi</th>
+                <th>Ultima Attività</th>
+              </tr>
+            </thead>
+            <tbody id="emp-body">
+              <tr><td colspan="8" class="text-center text-muted" style="padding:1.5rem">Caricamento...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TAB: Utenti ─────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-users">
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-user-gear text-accent"></i>&nbsp; Gestione Utenti</h3>
+          <button class="btn btn-primary btn-sm" id="btn-add-user">
+            <i class="fa-solid fa-user-plus"></i> Aggiungi Utente
+          </button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Username</th><th>Ruolo</th><th>Registrato il</th><th>Azioni</th></tr>
+            </thead>
+            <tbody id="users-body">
+              <tr><td colspan="4" class="text-center text-muted" style="padding:1.5rem">Caricamento...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

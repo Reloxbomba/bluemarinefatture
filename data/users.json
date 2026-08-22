@@ -1,0 +1,30 @@
+[
+  {
+    "id": "75345e1f-fa3a-43de-a1aa-7a1630ea3346",
+    "username": "admin",
+    "password": "$2b$10$oYj0pCub4Rwqg5xfLArEpuiW0zJ.nOM5IjLO1D7mshb95nIrKNiUG",
+    "role": "admin",
+    "createdAt": "2026-08-22T00:30:41.741Z"
+  },
+  {
+    "id": "294850d5-bfce-4845-b8da-d23760fedb4b",
+    "username": "mario",
+    "password": "$2b$10$wECcBgzvQ2DN0u.6AxjBPuB/Yds9tlQCfKazYN8eMKG1u8xHw7.wm",
+    "role": "employee",
+    "createdAt": "2026-08-22T00:36:12.286Z"
+  },
+  {
+    "id": "9d0b796f-fd15-443a-87c3-37ca280effed",
+    "username": "mario_test",
+    "password": "$2b$10$RDyLyHPLVZ/acxcdNq1/yea93u2XQTgjH9FmYyFFCNl7bJvaokBmC",
+    "role": "employee",
+    "createdAt": "2026-08-22T00:41:01.209Z"
+  },
+  {
+    "id": "673a13e4-07d8-4b4d-878c-616e7c753269",
+    "username": "dominic",
+    "password": "$2b$10$jTJYUQDgGoNUhvZYs7Hy6OEEsL8udy5aaVQKjCX4r0BNdZmowwqfm",
+    "role": "employee",
+    "createdAt": "2026-08-22T00:46:11.632Z"
+  }
+]

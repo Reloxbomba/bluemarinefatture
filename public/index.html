@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accedi – Blue Marine NOW</title>
+  <meta name="description" content="Portale di accesso al sistema fatture Blue Marine NOW" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
+</head>
+<body class="login-page">
+  <canvas id="particles-canvas"></canvas>
+
+  <div class="login-wrap">
+    <div class="login-card">
+
+      <div class="login-logo">
+        <div class="logo-icon">⚓</div>
+        <h1>Blue Marine NOW</h1>
+        <p>Portale Gestione Fatture</p>
+      </div>
+
+      <form class="login-form" id="login-form" autocomplete="on" novalidate>
+
+        <div id="login-error" class="login-error hidden">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span id="login-error-msg">Credenziali non valide</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="username">
+            <i class="fa-solid fa-user"></i>&nbsp; Username
+          </label>
+          <input
+            class="form-control"
+            type="text"
+            id="username"
+            name="username"
+            placeholder="Il tuo username"
+            autocomplete="username"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">
+            <i class="fa-solid fa-lock"></i>&nbsp; Password
+          </label>
+          <div class="pw-wrapper">
+            <input
+              class="form-control"
+              type="password"
+              id="password"
+              name="password"
+              placeholder="La tua password"
+              autocomplete="current-password"
+              required
+              style="padding-right:2.8rem;"
+            />
+            <button type="button" class="pw-toggle" id="pw-toggle" tabindex="-1" aria-label="Mostra/Nascondi password">
+              <i class="fa-solid fa-eye" id="pw-icon"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg w-full login-btn" id="login-btn">
+          <span id="btn-text"><i class="fa-solid fa-arrow-right-to-bracket"></i> Accedi</span>
+          <span id="btn-loading" class="hidden flex items-center gap-sm">
+            <span class="spinner"></span> Verifica in corso...
+          </span>
+        </button>
+
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Dipendente – Blue Marine NOW</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
+</head>
+<body class="dashboard-page">
+
+  <!-- Page Loader -->
+  <div id="page-loader">
+    <div class="spinner" style="width:44px;height:44px;border-width:3px;"></div>
+    <p class="text-muted" style="font-size:0.85rem;">Caricamento...</p>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container"></div>
+
+  <!-- Header -->
+  <header class="page-header">
+    <div class="header-logo">
+      <span class="anchor">⚓</span>
+      Blue Marine <em>NOW</em>
+    </div>
+    <div class="header-right">
+      <div class="user-chip">
+        <div class="avatar" id="user-avatar">?</div>
+        <div>
+          <div class="user-chip-name" id="user-name">–</div>
+          <div class="badge badge-employee user-chip-role">Dipendente</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="logout-btn">
+        <i class="fa-solid fa-right-from-bracket"></i> Esci
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="page-main">
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="card stat-card c-accent fade-in stagger-1">
+        <div class="stat-icon text-accent"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+        <div class="stat-value text-accent" id="stat-today-count">0</div>
+        <div class="stat-label">Fatture Oggi</div>
+      </div>
+      <div class="card stat-card c-success fade-in stagger-2">
+        <div class="stat-icon text-success"><i class="fa-solid fa-coins"></i></div>
+        <div class="stat-value text-success" id="stat-today-amount">$0</div>
+        <div class="stat-label">Incassato Oggi</div>
+      </div>
+      <div class="card stat-card c-gold fade-in stagger-3">
+        <div class="stat-icon text-gold"><i class="fa-solid fa-chart-line"></i></div>
+        <div class="stat-value text-gold" id="stat-total-count">0</div>
+        <div class="stat-label">Tot. Fatture</div>
+      </div>
+      <div class="card stat-card c-warning fade-in stagger-4">
+        <div class="stat-icon text-accent"><i class="fa-solid fa-sack-dollar"></i></div>
+        <div class="stat-value text-accent" id="stat-total-amount">$0</div>
+        <div class="stat-label">Tot. Incassato</div>
+      </div>
+    </div>
+
+    <!-- Content Grid -->
+    <div class="content-grid">
+
+      <!-- ── Invoice Form ───────────────────────────────────── -->
+      <div class="card fade-in" style="animation-delay:.22s">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-plus-circle text-accent"></i>&nbsp; Nuova Fattura</h3>
+        </div>
+        <div class="card-body">
+          <form id="invoice-form" style="display:flex;flex-direction:column;gap:1.1rem;" novalidate>
+
+            <div class="form-group">
+              <label class="form-label">👤 Nome Cliente</label>
+              <input
+                type="text" id="client-name" class="form-control"
+                placeholder="Es. Marco Rossi (lascia vuoto per Anonimo)"
+                maxlength="100"
+              />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">📦 Prodotto</label>
+              <select id="product-type" class="form-control" required>
+                <option value="">— Seleziona prodotto —</option>
+                <option value="A">Combo cibo</option>
+                <option value="B">Antistress singolo</option>
+                <option value="C">Combo cibo antistress</option>
+                <option value="D">Personalizzata</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="qty-select-group">
+              <label class="form-label">🔢 Quantità</label>
+              <select id="quantity" class="form-control" required disabled>
+                <option value="">— Prima seleziona un prodotto —</option>
+              </select>
+            </div>
+
+            <!-- Categoria D: campi manuali -->
+            <div id="cat-d-fields" style="display:none; flex-direction:column; gap:1.1rem;">
+              <div class="form-group">
+                <label class="form-label">🔢 Quantità</label>
+                <input
+                  type="number" id="manual-quantity" class="form-control"
+                  placeholder="Es. 5" min="1" max="99999" step="1"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">💶 Prezzo (€)</label>
+                <input
+                  type="number" id="manual-price" class="form-control"
+                  placeholder="Es. 150.00" min="0.01" step="0.01"
+                />
+              </div>
+            </div>
+
+            <!-- Price Preview -->
+            <div class="price-display" id="price-display">
+              <div class="amount" id="price-amount">–</div>
+              <div class="currency-label">Importo Fattura</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">📝 Note <span style="opacity:.5;font-weight:400;text-transform:none;">(opzionale)</span></label>
+              <textarea
+                id="invoice-notes" class="form-control"
+                placeholder="Note aggiuntive..."
+                maxlength="500" rows="3"
+              ></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-success btn-lg" id="submit-btn">
+              <i class="fa-solid fa-circle-check"></i> Registra Fattura
+            </button>
+
+          </form>
+        </div>
+      </div>
+
+      <!-- ── My Invoices ─────────────────────────────────────── -->
+      <div class="card fade-in" style="animation-delay:.32s">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-clock-rotate-left text-accent"></i>&nbsp; Le Mie Fatture</h3>
+          <span class="badge badge-employee" id="invoices-badge">0 fatture</span>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Cliente</th>
+                <th>Prodotto</th>
+                <th>Qtà</th>
+                <th>Prezzo</th>
+              </tr>
+            </thead>
+            <tbody id="my-invoices-body">
+              <tr>
+                <td colspan="5">
+                  <div class="empty-state">
+                    <i class="fa-solid fa-inbox"></i>
+                    <p>Nessuna fattura ancora registrata</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /.content-grid -->
+  </main>
+
+  <script src="/js/employee.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+[
+  {
+    "id": "b93e9147-1e35-41ea-bd8e-8cbbf06f5cd9",
+    "employeeId": "9d0b796f-fd15-443a-87c3-37ca280effed",
+    "employeeName": "mario_test",
+    "clientName": "Ciccio Pasticcio",
+    "productType": "A",
+    "productName": "Categoria A",
+    "productFormat": "NxN",
+    "quantity": 3,
+    "price": 1800,
+    "notes": "Test fattura",
+    "createdAt": "2026-08-22T00:41:01.254Z"
+  },
+  {
+    "id": "90652ec1-8f3a-4d40-a120-10707e099e0d",
+    "employeeId": "673a13e4-07d8-4b4d-878c-616e7c753269",
+    "employeeName": "dominic",
+    "clientName": "negro frovio hitler",
+    "productType": "A",
+    "productName": "Categoria A",
+    "productFormat": "NxN",
+    "quantity": 4,
+    "price": 2400,
+    "notes": "67",
+    "createdAt": "2026-08-22T00:48:23.937Z"
+  },
+  {
+    "id": "5dd5e510-67bf-4833-a686-9ca9efc66b6d",
+    "employeeId": "673a13e4-07d8-4b4d-878c-616e7c753269",
+    "employeeName": "dominic",
+    "clientName": "1213413",
+    "productType": "B",
+    "productName": "Categoria B",
+    "productFormat": "N",
+    "quantity": 3,
+    "price": 1050,
+    "notes": "1313",
+    "createdAt": "2026-08-22T00:48:35.321Z"
+  },
+  {
+    "id": "bc765660-d7c5-47b8-beba-04ab059f7cfa",
+    "employeeId": "673a13e4-07d8-4b4d-878c-616e7c753269",
+    "employeeName": "dominic",
+    "clientName": "Anonimo",
+    "productType": "D",
+    "productName": "Categoria D",
+    "productFormat": "custom",
+    "quantity": 2323,
+    "price": 2323,
+    "notes": "",
+    "createdAt": "2026-08-22T01:01:56.909Z"
+  }
+]
