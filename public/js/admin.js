@@ -4,11 +4,13 @@
 let currentUser  = null;
 let allInvoices  = [];
 let allUsers     = [];
+let allActivities = [];
 let stats        = null;
 let resetTargetId   = null;
 let deleteTarget    = null; // { id, name, type: 'user'|'invoice' }
 let empChart     = null;
 let prodChart    = null;
+let activityTargetId = null;
 
 // ─── Utils ────────────────────────────────────────────────────────
 const fmt$  = (n) => '$' + Number(n).toLocaleString('it-IT');
@@ -70,11 +72,12 @@ function hideLoader() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadStats(), loadInvoices(), loadUsers()]);
+  await Promise.all([loadStats(), loadInvoices(), loadUsers(), loadActivities()]);
   renderOverview();
   const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
   if (activeTab === 'employees') renderEmployeeStats();
   if (activeTab === 'users') renderUsers();
+  if (activeTab === 'activities') renderActivities();
 }
 
 // ─── Data Fetching ────────────────────────────────────────────────
@@ -89,6 +92,16 @@ async function loadInvoices() {
 async function loadUsers() {
   const res = await fetch('/api/users');
   allUsers  = await res.json();
+}
+async function loadActivities() {
+  const res = await fetch('/api/admin/activities');
+  allActivities = await res.json();
+}
+
+function displayPrice(invoice) {
+  return invoice.discountAmount
+    ? `<s class="text-muted">${fmt$(invoice.originalPrice)}</s> ${fmt$(invoice.price)} <span class="badge badge-success">-${invoice.discountPercentage}%</span>`
+    : fmt$(invoice.price);
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────
@@ -113,7 +126,7 @@ function renderOverview() {
         <td>${inv.clientName}</td>
         <td>${prodBadge(inv.productType)}</td>
         <td>${qtyPill(inv.productType, inv.quantity)}</td>
-        <td class="price-cell">${fmt$(inv.price)}</td>
+        <td class="price-cell">${displayPrice(inv)}</td>
       </tr>`).join('');
   }
 
@@ -200,7 +213,7 @@ function renderAllInvoices(list) {
   const footer = document.getElementById('inv-footer');
 
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-inbox"></i><p>Nessuna fattura trovata</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="fa-solid fa-inbox"></i><p>Nessuna fattura trovata</p></div></td></tr>`;
     footer.textContent = '';
     return;
   }
@@ -215,7 +228,7 @@ function renderAllInvoices(list) {
       <td>${inv.clientName}</td>
       <td>${prodBadge(inv.productType)}</td>
       <td>${qtyPill(inv.productType, inv.quantity)}</td>
-      <td class="price-cell">${fmt$(inv.price)}</td>
+      <td class="price-cell">${displayPrice(inv)}${inv.activityName ? `<div class="text-muted">${inv.activityName}</div>` : ''}</td>
       <td class="truncate" style="max-width:120px;" title="${inv.notes||''}">${inv.notes || '<span style="opacity:.4">–</span>'}</td>
       <td>
         <button class="btn btn-danger btn-sm btn-icon" onclick="openDeleteInvoice('${inv.id}')" title="Elimina fattura">
@@ -223,6 +236,82 @@ function renderAllInvoices(list) {
         </button>
       </td>
     </tr>`).join('');
+}
+
+function renderActivities() {
+  const tbody = document.getElementById('activities-body');
+  if (!allActivities.length) {
+    tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-building"></i><p>Nessuna attività convenzionata</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = allActivities.filter(activity => activity.active !== false).map(activity => `
+    <tr>
+      <td><strong>${activity.name}</strong></td>
+      <td><span class="badge badge-success">-${activity.discountPercentage}%</span></td>
+      <td><span class="text-muted">${fmtDT(activity.createdAt)}</span></td>
+      <td><div style="display:flex;gap:.4rem;align-items:center;">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openActivityModal('${activity.id}')" title="Modifica attività"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteActivity('${activity.id}')" title="Disattiva attività"><i class="fa-solid fa-trash"></i></button>
+      </div></td>
+    </tr>`).join('');
+}
+
+function openActivityModal(id = null) {
+  activityTargetId = id;
+  const activity = allActivities.find(item => item.id === id);
+  document.getElementById('activity-modal-title').textContent = activity ? 'Modifica attività' : 'Nuova attività';
+  document.getElementById('activity-name').value = activity?.name || '';
+  document.getElementById('activity-discount').value = activity?.discountPercentage ?? '';
+  document.getElementById('modal-activity').classList.remove('hidden');
+  document.getElementById('activity-name').focus();
+}
+
+function closeActivityModal() {
+  document.getElementById('modal-activity').classList.add('hidden');
+  activityTargetId = null;
+}
+
+document.getElementById('btn-add-activity').addEventListener('click', () => openActivityModal());
+['activity-modal-close', 'activity-modal-cancel'].forEach(id => document.getElementById(id).addEventListener('click', closeActivityModal));
+document.getElementById('modal-activity').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeActivityModal();
+});
+document.getElementById('activity-modal-save').addEventListener('click', async () => {
+  const name = document.getElementById('activity-name').value.trim();
+  const discountPercentage = Number(document.getElementById('activity-discount').value);
+  if (!name || !Number.isFinite(discountPercentage) || discountPercentage < 0 || discountPercentage > 100) {
+    toast('Inserisci un nome e una percentuale tra 0 e 100', 'error');
+    return;
+  }
+  try {
+    const res = await fetch(`/api/admin/activities${activityTargetId ? `/${activityTargetId}` : ''}`, {
+      method: activityTargetId ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, discountPercentage })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    await loadActivities();
+    renderActivities();
+    closeActivityModal();
+    toast(activityTargetId ? 'Attività aggiornata' : 'Attività creata', 'success');
+  } catch (err) {
+    toast(err.message || 'Errore nel salvataggio dell’attività', 'error');
+  }
+});
+
+async function deleteActivity(id) {
+  if (!window.confirm('Disattivare questa attività? Le fatture già registrate resteranno invariate.')) return;
+  try {
+    const res = await fetch(`/api/admin/activities/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    await loadActivities();
+    renderActivities();
+    toast('Attività disattivata', 'success');
+  } catch (err) {
+    toast(err.message || 'Errore nella disattivazione', 'error');
+  }
 }
 
 async function applyFilters() {
@@ -490,6 +579,8 @@ function switchTab(name) {
     renderEmployeeStats();
   } else if (name === 'users') {
     renderUsers();
+  } else if (name === 'activities') {
+    renderActivities();
   } else if (name === 'overview') {
     setTimeout(renderCharts, 80);
   }
@@ -501,10 +592,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 setInterval(async () => {
   if (!currentUser) return;
-  await Promise.all([loadStats(), loadInvoices(), loadUsers()]);
+  await Promise.all([loadStats(), loadInvoices(), loadUsers(), loadActivities()]);
   const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
   if (activeTab === 'employees') renderEmployeeStats();
   if (activeTab === 'overview') renderOverview();
+  if (activeTab === 'activities') renderActivities();
 }, 15000);
 
 // ─── Filters ──────────────────────────────────────────────────────

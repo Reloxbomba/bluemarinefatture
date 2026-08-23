@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard Dipendente – Blue Marine NOW</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%93%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" />
 </head>
@@ -86,6 +87,14 @@
             </div>
 
             <div class="form-group">
+              <label class="form-label" for="client-activity">🏢 Attività del cliente</label>
+              <select id="client-activity" class="form-control">
+                <option value="">Nessuna convenzione</option>
+              </select>
+              <span class="text-muted" id="discount-hint">Se il cliente lavora in un’attività convenzionata, selezionala qui.</span>
+            </div>
+
+            <div class="form-group">
               <label class="form-label">📦 Prodotto</label>
               <select id="product-type" class="form-control" required>
                 <option value="">— Seleziona prodotto —</option>
@@ -124,7 +133,8 @@
             <!-- Price Preview -->
             <div class="price-display" id="price-display">
               <div class="amount" id="price-amount">–</div>
-              <div class="currency-label">Importo Fattura</div>
+              <div class="currency-label" id="price-label">Importo Fattura</div>
+              <div class="text-success hidden" id="discount-preview"></div>
             </div>
 
             <div class="form-group">
@@ -158,12 +168,12 @@
                 <th>Cliente</th>
                 <th>Prodotto</th>
                 <th>Qtà</th>
-                <th>Prezzo</th>
+                <th>Prezzo</th><th>Convenzione</th>
               </tr>
             </thead>
             <tbody id="my-invoices-body">
               <tr>
-                <td colspan="5">
+                <td colspan="6">
                   <div class="empty-state">
                     <i class="fa-solid fa-inbox"></i>
                     <p>Nessuna fattura ancora registrata</p>

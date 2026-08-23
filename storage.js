@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const INVOICES_FILE = path.join(DATA_DIR, 'invoices.json');
+const ACTIVITIES_FILE = path.join(DATA_DIR, 'activities.json');
 const useDatabase = Boolean(process.env.DATABASE_URL);
 const pool = useDatabase ? new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -26,6 +27,7 @@ async function initStorage() {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '[]', 'utf8');
     if (!fs.existsSync(INVOICES_FILE)) fs.writeFileSync(INVOICES_FILE, '[]', 'utf8');
+    if (!fs.existsSync(ACTIVITIES_FILE)) fs.writeFileSync(ACTIVITIES_FILE, '[]', 'utf8');
     return;
   }
 
@@ -36,7 +38,7 @@ async function initStorage() {
     )
   `);
 
-  for (const [dataKey, file] of [['users', USERS_FILE], ['invoices', INVOICES_FILE]]) {
+  for (const [dataKey, file] of [['users', USERS_FILE], ['invoices', INVOICES_FILE], ['activities', ACTIVITIES_FILE]]) {
     await pool.query(
       'INSERT INTO app_data (data_key, data_value) VALUES ($1, $2::jsonb) ON CONFLICT (data_key) DO NOTHING',
       [dataKey, JSON.stringify(readFile(file))]
@@ -66,4 +68,4 @@ async function writeJSON(file, data) {
   );
 }
 
-module.exports = { USERS_FILE, INVOICES_FILE, initStorage, readJSON, writeJSON, useDatabase };
+module.exports = { USERS_FILE, INVOICES_FILE, ACTIVITIES_FILE, initStorage, readJSON, writeJSON, useDatabase };

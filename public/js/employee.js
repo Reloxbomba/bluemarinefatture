@@ -26,6 +26,7 @@ const PRODUCTS = {
 
 let currentUser = null;
 let myInvoices  = [];
+let activities  = [];
 
 // ─── Utils ────────────────────────────────────────────────────────
 const fmt$  = (n) => '$' + Number(n).toLocaleString('it-IT');
@@ -61,11 +62,20 @@ async function init() {
     document.getElementById('user-name').textContent   = user.username;
     document.getElementById('user-avatar').textContent = user.username[0].toUpperCase();
 
-    await loadMyInvoices();
+    await Promise.all([loadActivities(), loadMyInvoices()]);
     hideLoader();
   } catch {
     window.location.href = '/';
   }
+}
+
+async function loadActivities() {
+  const res = await fetch('/api/activities');
+  activities = await res.json();
+  const select = document.getElementById('client-activity');
+  select.innerHTML = '<option value="">Nessuna convenzione</option>' + activities.map(activity =>
+    `<option value="${activity.id}">${activity.name} (-${activity.discountPercentage}%)</option>`
+  ).join('');
 }
 
 function hideLoader() {
@@ -111,7 +121,8 @@ function renderInvoices() {
       <td>${inv.clientName}</td>
       <td>${hideBadge(inv.productType)}</td>
       <td><span class="qty-pill">${PRODUCTS[inv.productType]?.fmt(inv.quantity) ?? inv.quantity}</span></td>
-      <td class="price-cell">${fmt$(inv.price)}</td>
+      <td class="price-cell">${inv.discountAmount ? `<s class="text-muted">${fmt$(inv.originalPrice)}</s> ${fmt$(inv.price)}` : fmt$(inv.price)}</td>
+      <td>${inv.activityName ? `<span class="badge badge-success">-${inv.discountPercentage}%</span><div class="text-muted">${inv.activityName}</div>` : '<span class="text-muted">–</span>'}</td>
     </tr>
   `).join('');
 }
@@ -128,6 +139,9 @@ const qtySelectGroup = document.getElementById('qty-select-group');
 const catDFields     = document.getElementById('cat-d-fields');
 const manualQtyInp   = document.getElementById('manual-quantity');
 const manualPriceInp = document.getElementById('manual-price');
+const activitySelect = document.getElementById('client-activity');
+const discountHint = document.getElementById('discount-hint');
+const discountPreview = document.getElementById('discount-preview');
 
 selProduct.addEventListener('change', () => {
   const type = selProduct.value;
@@ -162,20 +176,45 @@ selProduct.addEventListener('change', () => {
     ).join('');
 });
 
+function updatePricePreview(originalPrice) {
+  const activity = activities.find(item => item.id === activitySelect.value);
+  const discount = activity ? Number(activity.discountPercentage) : 0;
+  const total = Math.round((originalPrice * (1 - discount / 100)) * 100) / 100;
+  if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
+    priceAmt.textContent = '–';
+    priceDisp.classList.remove('active');
+    discountPreview.classList.add('hidden');
+    return;
+  }
+  priceAmt.textContent = fmt$(total);
+  priceDisp.classList.add('active');
+  if (activity) {
+    discountHint.textContent = `${activity.name}: sconto del ${activity.discountPercentage}% applicato al cliente.`;
+    discountPreview.textContent = `Prezzo originale ${fmt$(originalPrice)} · Risparmio ${fmt$(Math.round((originalPrice - total) * 100) / 100)}`;
+    discountPreview.classList.remove('hidden');
+  } else {
+    discountHint.textContent = 'Se il cliente lavora in un’attività convenzionata, selezionala qui.';
+    discountPreview.classList.add('hidden');
+  }
+}
+
+activitySelect.addEventListener('change', () => {
+  const originalPrice = selProduct.value === 'D' ? parseFloat(manualPriceInp.value) : PRODUCTS[selProduct.value]?.prices[parseInt(selQty.value)];
+  updatePricePreview(originalPrice);
+});
+
 selQty.addEventListener('change', () => {
   const type = selProduct.value;
   const qty  = parseInt(selQty.value);
   if (!type || !qty) { priceAmt.textContent = '–'; priceDisp.classList.remove('active'); return; }
-  priceAmt.textContent = fmt$(PRODUCTS[type].prices[qty]);
-  priceDisp.classList.add('active');
+  updatePricePreview(PRODUCTS[type].prices[qty]);
 });
 
 // Aggiorna price display live per Cat D
 function updateCatDPrice() {
   const price = parseFloat(manualPriceInp.value);
   if (!isNaN(price) && price > 0) {
-    priceAmt.textContent = fmt$(price);
-    priceDisp.classList.add('active');
+    updatePricePreview(price);
   } else {
     priceAmt.textContent = '–';
     priceDisp.classList.remove('active');
@@ -211,6 +250,7 @@ invoiceForm.addEventListener('submit', async (e) => {
       clientName:  document.getElementById('client-name').value.trim(),
       productType,
       quantity,
+      activityId:   activitySelect.value || null,
       notes:       document.getElementById('invoice-notes').value.trim()
     };
     if (productType === 'D') body.manualPrice = manualPrice;
@@ -230,6 +270,9 @@ invoiceForm.addEventListener('submit', async (e) => {
     selQty.innerHTML = '<option value="">— Prima seleziona un prodotto —</option>';
     qtySelectGroup.style.display = '';
     catDFields.style.display = 'none';
+    activitySelect.value = '';
+    discountHint.textContent = 'Se il cliente lavora in un’attività convenzionata, selezionala qui.';
+    discountPreview.classList.add('hidden');
     priceAmt.textContent = '–';
     priceDisp.classList.remove('active');
 

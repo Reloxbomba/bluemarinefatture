@@ -5,7 +5,7 @@ const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { USERS_FILE, INVOICES_FILE, initStorage, readJSON, writeJSON } = require('./storage');
+const { USERS_FILE, INVOICES_FILE, ACTIVITIES_FILE, initStorage, readJSON, writeJSON } = require('./storage');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -75,13 +75,18 @@ app.get('/api/auth/me', (req, res) => {
 // ══════════════════════════════════════════════════════════════════
 app.get('/api/products', requireAuth, (req, res) => res.json(PRODUCTS));
 
+app.get('/api/activities', requireAuth, async (req, res) => {
+  const activities = await readJSON(ACTIVITIES_FILE);
+  res.json(activities.filter(activity => activity.active !== false));
+});
+
 // ══════════════════════════════════════════════════════════════════
 // INVOICES
 // ══════════════════════════════════════════════════════════════════
 
 // Employee: create invoice
 app.post('/api/invoices', requireAuth, async (req, res) => {
-  const { clientName, productType, quantity, notes, manualPrice } = req.body;
+  const { clientName, productType, quantity, notes, manualPrice, activityId } = req.body;
   const product = PRODUCTS[productType];
   const qty = productType === 'D'
     ? String(quantity ?? '').trim()
@@ -105,6 +110,17 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
     finalPrice = product.prices[qty];
   }
 
+  let activity = null;
+  let discountPercentage = 0;
+  if (activityId) {
+    const activities = await readJSON(ACTIVITIES_FILE);
+    activity = activities.find(item => item.id === activityId && item.active !== false);
+    if (!activity) return res.status(400).json({ error: 'Attività non valida o non più disponibile' });
+    discountPercentage = Number(activity.discountPercentage);
+  }
+  const discountAmount = Math.round(finalPrice * discountPercentage) / 100;
+  const discountedPrice = Math.round((finalPrice - discountAmount) * 100) / 100;
+
   const invoice = {
     id:            uuidv4(),
     employeeId:    req.session.user.id,
@@ -114,7 +130,12 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
     productName:   product.name,
     productFormat: product.format,
     quantity:      qty,
-    price:         finalPrice,
+    originalPrice: finalPrice,
+    discountPercentage,
+    discountAmount,
+    activityId:    activity?.id || null,
+    activityName:  activity?.name || null,
+    price:         discountedPrice,
     notes:         (notes || '').trim().substring(0, 500),
     createdAt:     new Date().toISOString()
   };
@@ -200,6 +221,59 @@ app.get('/api/stats', requireAdmin, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════
 // USERS
 // ══════════════════════════════════════════════════════════════════
+app.get('/api/admin/activities', requireAdmin, async (req, res) => {
+  res.json(await readJSON(ACTIVITIES_FILE));
+});
+
+app.post('/api/admin/activities', requireAdmin, async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  const discountPercentage = Number(req.body.discountPercentage);
+  if (!name || name.length > 100 || !Number.isFinite(discountPercentage) || discountPercentage < 0 || discountPercentage > 100)
+    return res.status(400).json({ error: 'Inserisci un nome e una percentuale tra 0 e 100' });
+
+  const activities = await readJSON(ACTIVITIES_FILE);
+  if (activities.some(activity => activity.name.toLowerCase() === name.toLowerCase() && activity.active !== false))
+    return res.status(400).json({ error: 'Attività già presente' });
+
+  const activity = {
+    id: uuidv4(),
+    name,
+    discountPercentage: Math.round(discountPercentage * 100) / 100,
+    active: true,
+    createdAt: new Date().toISOString()
+  };
+  activities.push(activity);
+  await writeJSON(ACTIVITIES_FILE, activities);
+  res.status(201).json({ success: true, activity });
+});
+
+app.put('/api/admin/activities/:id', requireAdmin, async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  const discountPercentage = Number(req.body.discountPercentage);
+  if (!name || name.length > 100 || !Number.isFinite(discountPercentage) || discountPercentage < 0 || discountPercentage > 100)
+    return res.status(400).json({ error: 'Inserisci un nome e una percentuale tra 0 e 100' });
+
+  const activities = await readJSON(ACTIVITIES_FILE);
+  const activity = activities.find(item => item.id === req.params.id);
+  if (!activity) return res.status(404).json({ error: 'Attività non trovata' });
+  if (activities.some(item => item.id !== activity.id && item.active !== false && item.name.toLowerCase() === name.toLowerCase()))
+    return res.status(400).json({ error: 'Attività già presente' });
+  activity.name = name;
+  activity.discountPercentage = Math.round(discountPercentage * 100) / 100;
+  activity.active = true;
+  await writeJSON(ACTIVITIES_FILE, activities);
+  res.json({ success: true, activity });
+});
+
+app.delete('/api/admin/activities/:id', requireAdmin, async (req, res) => {
+  const activities = await readJSON(ACTIVITIES_FILE);
+  const activity = activities.find(item => item.id === req.params.id);
+  if (!activity) return res.status(404).json({ error: 'Attività non trovata' });
+  activity.active = false;
+  await writeJSON(ACTIVITIES_FILE, activities);
+  res.json({ success: true });
+});
+
 app.get('/api/users', requireAdmin, async (req, res) => {
   res.json((await readJSON(USERS_FILE)).map(u => ({
     id: u.id,
@@ -276,10 +350,11 @@ app.get('/api/export/csv', requireAdmin, async (req, res) => {
   const invoices = await readJSON(INVOICES_FILE);
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-  const header = ['ID','Dipendente','Cliente','Prodotto','Quantità','Prezzo ($)','Note','Data e Ora'];
+  const header = ['ID','Dipendente','Cliente','Prodotto','Quantità','Prezzo originale ($)','Sconto (%)','Risparmio ($)','Prezzo pagato ($)','Attività','Note','Data e Ora'];
   const rows   = invoices.map(i => [
     esc(i.id), esc(i.employeeName), esc(i.clientName), esc(PRODUCTS[i.productType]?.name || i.productName),
-    esc(i.quantity), esc(i.price), esc(i.notes),
+    esc(i.quantity), esc(i.originalPrice ?? i.price), esc(i.discountPercentage ?? 0), esc(i.discountAmount ?? 0),
+    esc(i.price), esc(i.activityName), esc(i.notes),
     esc(new Date(i.createdAt).toLocaleString('it-IT'))
   ]);
 
