@@ -175,7 +175,7 @@ app.get('/api/stats', requireAdmin, async (req, res) => {
       commissionPercentage,
       totalInvoices: empAll.length,
       totalAmount:   empAll.reduce((s, i) => s + i.price, 0),
-      amountDue:     Math.round(empAll.reduce((s, i) => s + i.price, 0) * commissionPercentage * 100) / 100,
+      amountDue:     Math.round(empAll.reduce((s, i) => s + i.price, 0) * commissionPercentage) / 100,
       todayInvoices: empToday.length,
       todayAmount:   empToday.reduce((s, i) => s + i.price, 0),
       lastActivity:  empAll.length ? empAll[empAll.length - 1].createdAt : null

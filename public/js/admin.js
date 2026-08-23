@@ -306,7 +306,7 @@ async function updateCommission(id, value) {
     const employee = stats?.employees.find(emp => emp.id === id);
     if (employee) {
       employee.commissionPercentage = data.commissionPercentage;
-      employee.amountDue = Math.round(employee.totalAmount * data.commissionPercentage * 100) / 100;
+      employee.amountDue = Math.round(employee.totalAmount * data.commissionPercentage) / 100;
     }
     renderEmployeeStats();
     toast('Percentuale aggiornata', 'success');
