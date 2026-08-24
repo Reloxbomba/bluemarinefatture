@@ -345,7 +345,7 @@ function renderEmployeeStats() {
   const sorted = [...stats.employees].sort((a,b) => b.totalInvoices - a.totalInvoices);
 
   if (!sorted.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-users"></i><p>Nessun dipendente registrato</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="fa-solid fa-users"></i><p>Nessun dipendente registrato</p></div></td></tr>`;
     return;
   }
 
@@ -371,6 +371,11 @@ function renderEmployeeStats() {
       <td>${emp.todayInvoices}</td>
       <td style="color:var(--accent);font-weight:700;">${fmt$(emp.todayAmount)}</td>
       <td><span style="color:var(--text-3);font-size:.8rem;">${emp.lastActivity ? fmtDT(emp.lastActivity) : 'Mai'}</span></td>
+      <td>
+        <button class="btn btn-warning btn-sm" onclick="resetSalary('${emp.id}', '${emp.username.replace(/'/g, "\\'")}')" title="Azzera il saldo da pagare">
+          <i class="fa-solid fa-money-bill-transfer"></i> Segna pagato
+        </button>
+      </td>
     </tr>`).join('');
 }
 
@@ -395,13 +400,28 @@ async function updateCommission(id, value) {
     const employee = stats?.employees.find(emp => emp.id === id);
     if (employee) {
       employee.commissionPercentage = data.commissionPercentage;
-      employee.amountDue = Math.round(employee.totalAmount * data.commissionPercentage) / 100;
+      employee.amountDue = Math.round(employee.payableAmount * data.commissionPercentage) / 100;
     }
     renderEmployeeStats();
     toast('Percentuale aggiornata', 'success');
   } catch (err) {
     toast(err.message || 'Errore nel salvataggio della percentuale', 'error');
     renderEmployeeStats();
+  }
+}
+
+async function resetSalary(id, name) {
+  if (!window.confirm(`Segnare come pagato lo stipendio di ${name}? Il saldo verrà azzerato e le nuove fatture verranno conteggiate da ora.`)) return;
+
+  try {
+    const res = await fetch(`/api/users/${id}/salary-reset`, { method: 'PUT' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    await loadStats();
+    renderEmployeeStats();
+    toast(`Saldo di ${name} azzerato`, 'success');
+  } catch (err) {
+    toast(err.message || 'Errore nel reset dello stipendio', 'error');
   }
 }
 

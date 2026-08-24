@@ -186,6 +186,10 @@ app.get('/api/stats', requireAdmin, async (req, res) => {
 
   const employeeStats = users.filter(u => u.role === 'employee').map(emp => {
     const empAll   = invoices.filter(i => i.employeeId === emp.id);
+    const salaryResetAt = emp.salaryResetAt || null;
+    const payableInvoices = salaryResetAt
+      ? empAll.filter(i => i.createdAt > salaryResetAt)
+      : empAll;
     const empToday = empAll.filter(i => i.createdAt.startsWith(today));
     const commissionPercentage = Number.isFinite(Number(emp.commissionPercentage))
       ? Number(emp.commissionPercentage)
@@ -196,7 +200,9 @@ app.get('/api/stats', requireAdmin, async (req, res) => {
       commissionPercentage,
       totalInvoices: empAll.length,
       totalAmount:   empAll.reduce((s, i) => s + i.price, 0),
-      amountDue:     Math.round(empAll.reduce((s, i) => s + i.price, 0) * commissionPercentage) / 100,
+      payableAmount:  payableInvoices.reduce((s, i) => s + i.price, 0),
+      amountDue:     Math.round(payableInvoices.reduce((s, i) => s + i.price, 0) * commissionPercentage) / 100,
+      salaryResetAt,
       todayInvoices: empToday.length,
       todayAmount:   empToday.reduce((s, i) => s + i.price, 0),
       lastActivity:  empAll.length ? empAll[empAll.length - 1].createdAt : null
@@ -341,6 +347,16 @@ app.put('/api/users/:id/commission', requireAdmin, async (req, res) => {
   user.commissionPercentage = Math.round(commissionPercentage * 100) / 100;
   await writeJSON(USERS_FILE, users);
   res.json({ success: true, commissionPercentage: user.commissionPercentage });
+});
+
+app.put('/api/users/:id/salary-reset', requireAdmin, async (req, res) => {
+  const users = await readJSON(USERS_FILE);
+  const user = users.find(u => u.id === req.params.id && u.role === 'employee');
+  if (!user) return res.status(404).json({ error: 'Dipendente non trovato' });
+
+  user.salaryResetAt = new Date().toISOString();
+  await writeJSON(USERS_FILE, users);
+  res.json({ success: true, salaryResetAt: user.salaryResetAt });
 });
 
 // ══════════════════════════════════════════════════════════════════
