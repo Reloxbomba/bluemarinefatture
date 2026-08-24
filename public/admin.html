@@ -118,6 +118,25 @@
     </div>
   </div>
 
+  <!-- ══ MODAL: Conferma Pagamento Stipendio ═════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-confirm-salary">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-money-bill-transfer text-gold"></i>&nbsp; Conferma Pagamento</h3>
+        <button class="btn btn-ghost btn-icon" id="modal-salary-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-2)">Segnare come pagato lo stipendio di <strong id="salary-target-name">–</strong>? Il saldo verrà azzerato e le nuove fatture verranno conteggiate da ora.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="modal-salary-cancel">Annulla</button>
+        <button class="btn btn-warning" id="modal-salary-confirm">
+          <i class="fa-solid fa-check"></i> Conferma pagamento
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ HEADER ═══════════════════════════════════════════════════ -->
   <header class="page-header">
     <div class="header-logo">

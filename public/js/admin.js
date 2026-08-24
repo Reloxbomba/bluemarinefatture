@@ -8,6 +8,7 @@ let allActivities = [];
 let stats        = null;
 let resetTargetId   = null;
 let deleteTarget    = null; // { id, name, type: 'user'|'invoice' }
+let salaryTarget    = null;
 let empChart     = null;
 let prodChart    = null;
 let activityTargetId = null;
@@ -411,7 +412,27 @@ async function updateCommission(id, value) {
 }
 
 async function resetSalary(id, name) {
-  if (!window.confirm(`Segnare come pagato lo stipendio di ${name}? Il saldo verrà azzerato e le nuove fatture verranno conteggiate da ora.`)) return;
+  salaryTarget = { id, name };
+  document.getElementById('salary-target-name').textContent = name;
+  document.getElementById('modal-confirm-salary').classList.remove('hidden');
+}
+
+['modal-salary-close','modal-salary-cancel'].forEach(id => {
+  document.getElementById(id).addEventListener('click', closeSalaryModal);
+});
+document.getElementById('modal-confirm-salary').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeSalaryModal();
+});
+function closeSalaryModal() {
+  document.getElementById('modal-confirm-salary').classList.add('hidden');
+  salaryTarget = null;
+}
+
+document.getElementById('modal-salary-confirm').addEventListener('click', async () => {
+  if (!salaryTarget) return;
+  const { id, name } = salaryTarget;
+  const confirmButton = document.getElementById('modal-salary-confirm');
+  confirmButton.disabled = true;
 
   try {
     const res = await fetch(`/api/users/${id}/salary-reset`, { method: 'PUT' });
@@ -422,8 +443,11 @@ async function resetSalary(id, name) {
     toast(`Saldo di ${name} azzerato`, 'success');
   } catch (err) {
     toast(err.message || 'Errore nel reset dello stipendio', 'error');
+  } finally {
+    confirmButton.disabled = false;
+    closeSalaryModal();
   }
-}
+});
 
 // ─── Users Tab ────────────────────────────────────────────────────
 function renderUsers() {
