@@ -39,7 +39,7 @@ const requireAdmin = (req, res, next) => {
 const PRODUCTS = {
   A: { id: 'A', name: 'Combo cibo', format: 'NxN',    prices: {1:600,2:1200,3:1800,4:2400,5:3000,6:3600,7:4200,8:4800,9:5400,10:6000,15:9000,20:12000} },
   B: { id: 'B', name: 'Antistress singolo', format: 'N',      prices: {1:350,2:700,3:1050,4:1400,5:1750,6:2100,7:2450,8:2800,9:3150,10:3500,15:5250,20:7000} },
-  C: { id: 'C', name: 'Combo cibo antistress', format: 'NxNxN',  prices: {1:950,2:1900,3:2850,4:3800,5:4750,6:5700,7:6650,8:7600,9:8550,10:9500,20:19000} },
+  C: { id: 'C', name: 'Combo cibo antistress', format: 'NxNxN',  prices: {1:950,2:1900,3:2850,4:3800,5:4750,6:5700,7:6650,8:7600,9:8550,10:9500,15:14250,20:19000} },
   D: { id: 'D', name: 'Personalizzata', format: 'custom', prices: null } // quantità e prezzo liberi
 };
 
