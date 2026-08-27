@@ -39,16 +39,39 @@
     "createdAt": "2026-08-22T00:48:35.321Z"
   },
   {
-    "id": "bc765660-d7c5-47b8-beba-04ab059f7cfa",
+    "id": "195dbd59-3da7-434a-aaa5-5eea636d4d6e",
+    "employeeId": "673a13e4-07d8-4b4d-878c-616e7c753269",
+    "employeeName": "dominic",
+    "clientName": "Anonimo",
+    "productType": "E",
+    "productName": "Coupon",
+    "productFormat": "custom_qty",
+    "quantity": 4,
+    "originalPrice": 0,
+    "discountPercentage": 0,
+    "discountAmount": 0,
+    "activityId": null,
+    "activityName": null,
+    "price": 0,
+    "notes": "",
+    "createdAt": "2026-08-27T09:55:21.930Z"
+  },
+  {
+    "id": "1879e48f-392e-4c94-a209-74c97795576b",
     "employeeId": "673a13e4-07d8-4b4d-878c-616e7c753269",
     "employeeName": "dominic",
     "clientName": "Anonimo",
     "productType": "D",
-    "productName": "Categoria D",
+    "productName": "Personalizzata",
     "productFormat": "custom",
-    "quantity": 2323,
-    "price": 2323,
+    "quantity": "10-10-10",
+    "originalPrice": 9500,
+    "discountPercentage": 0,
+    "discountAmount": 0,
+    "activityId": null,
+    "activityName": null,
+    "price": 9500,
     "notes": "",
-    "createdAt": "2026-08-22T01:01:56.909Z"
+    "createdAt": "2026-08-27T09:57:46.707Z"
   }
 ]

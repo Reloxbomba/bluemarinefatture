@@ -25,6 +25,8 @@
     "username": "dominic",
     "password": "$2b$10$jTJYUQDgGoNUhvZYs7Hy6OEEsL8udy5aaVQKjCX4r0BNdZmowwqfm",
     "role": "employee",
-    "createdAt": "2026-08-22T00:46:11.632Z"
+    "createdAt": "2026-08-22T00:46:11.632Z",
+    "salaryResetAt": "2026-08-27T09:56:19.284Z",
+    "commissionPercentage": 35
   }
 ]

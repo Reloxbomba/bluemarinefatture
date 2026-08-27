@@ -21,6 +21,11 @@ const PRODUCTS = {
     name: 'Personalizzata',
     fmt:  (n) => `${n}`,
     prices: null  // manuale
+  },
+  E: {
+    name: 'Coupon',
+    fmt:  (n) => `${n}`,
+    prices: null
   }
 };
 
@@ -33,6 +38,15 @@ const fmt$  = (n) => '$' + Number(n).toLocaleString('it-IT');
 const fmtDT = (iso) => new Date(iso).toLocaleString('it-IT', {
   day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'
 });
+const getLocalDateString = (dateInput = new Date()) => {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Rome',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+};
 
 function toast(msg, type = 'info') {
   const el = document.createElement('div');
@@ -44,7 +58,7 @@ function toast(msg, type = 'info') {
 }
 
 function hideBadge(type) {
-  const b = { A:'badge-A', B:'badge-B', C:'badge-C', D:'badge-D' };
+  const b = { A:'badge-A', B:'badge-B', C:'badge-C', D:'badge-D', E:'badge-E' };
   return `<span class="badge ${b[type] || ''}">${
     PRODUCTS[type]?.name || type
   }</span>`;
@@ -97,8 +111,8 @@ async function loadMyInvoices() {
 }
 
 function updateStats() {
-  const today = new Date().toISOString().slice(0,10);
-  const tInv  = myInvoices.filter(i => i.createdAt.startsWith(today));
+  const today = getLocalDateString();
+  const tInv  = myInvoices.filter(i => getLocalDateString(i.createdAt) === today);
 
   document.getElementById('stat-today-count').textContent  = tInv.length;
   document.getElementById('stat-today-amount').textContent = fmt$(tInv.reduce((s,i) => s + i.price, 0));
@@ -121,7 +135,7 @@ function renderInvoices() {
       <td>${inv.clientName}</td>
       <td>${hideBadge(inv.productType)}</td>
       <td><span class="qty-pill">${PRODUCTS[inv.productType]?.fmt(inv.quantity) ?? inv.quantity}</span></td>
-      <td class="price-cell">${inv.discountAmount ? `<s class="text-muted">${fmt$(inv.originalPrice)}</s> ${fmt$(inv.price)}` : fmt$(inv.price)}</td>
+      <td class="price-cell">${inv.productType === 'E' ? '–' : (inv.discountAmount ? `<s class="text-muted">${fmt$(inv.originalPrice)}</s> ${fmt$(inv.price)}` : fmt$(inv.price))}</td>
       <td>${inv.activityName ? `<span class="badge badge-success">-${inv.discountPercentage}%</span><div class="text-muted">${inv.activityName}</div>` : '<span class="text-muted">–</span>'}</td>
     </tr>
   `).join('');
@@ -157,11 +171,24 @@ selProduct.addEventListener('change', () => {
   }
 
   if (type === 'D') {
-    // Categoria D – campi manuali
+    // Categoria D – Personalizzata (quantità e prezzo manuali)
     qtySelectGroup.style.display = 'none';
     catDFields.style.display = 'flex';
+    document.getElementById('manual-price-group').style.display = 'block';
     manualQtyInp.value = '';
     manualPriceInp.value = '';
+    manualQtyInp.placeholder = 'Es. 5, -- oppure xxx';
+    return;
+  }
+
+  if (type === 'E') {
+    // Categoria E – Coupon (quantità manuale, senza prezzo)
+    qtySelectGroup.style.display = 'none';
+    catDFields.style.display = 'flex';
+    document.getElementById('manual-price-group').style.display = 'none';
+    manualQtyInp.value = '';
+    manualPriceInp.value = '';
+    manualQtyInp.placeholder = 'Es. 3';
     return;
   }
 
@@ -199,7 +226,7 @@ function updatePricePreview(originalPrice) {
 }
 
 activitySelect.addEventListener('change', () => {
-  const originalPrice = selProduct.value === 'D' ? parseFloat(manualPriceInp.value) : PRODUCTS[selProduct.value]?.prices[parseInt(selQty.value)];
+  const originalPrice = selProduct.value === 'D' ? parseFloat(manualPriceInp.value) : (selProduct.value === 'E' ? 0 : PRODUCTS[selProduct.value]?.prices[parseInt(selQty.value)]);
   updatePricePreview(originalPrice);
 });
 
@@ -212,9 +239,14 @@ selQty.addEventListener('change', () => {
 
 // Aggiorna price display live per Cat D
 function updateCatDPrice() {
-  const price = parseFloat(manualPriceInp.value);
-  if (!isNaN(price) && price > 0) {
-    updatePricePreview(price);
+  if (selProduct.value === 'D') {
+    const price = parseFloat(manualPriceInp.value);
+    if (!isNaN(price) && price > 0) {
+      updatePricePreview(price);
+    } else {
+      priceAmt.textContent = '–';
+      priceDisp.classList.remove('active');
+    }
   } else {
     priceAmt.textContent = '–';
     priceDisp.classList.remove('active');
@@ -236,6 +268,13 @@ invoiceForm.addEventListener('submit', async (e) => {
     manualPrice = parseFloat(manualPriceInp.value);
     if (!quantity) { toast('Inserisci una quantità valida', 'error'); return; }
     if (isNaN(manualPrice) || manualPrice <= 0) { toast('Inserisci un prezzo valido', 'error'); return; }
+  } else if (productType === 'E') {
+    quantity = manualQtyInp.value.trim();
+    const qtyInt = parseInt(quantity, 10);
+    if (!quantity || isNaN(qtyInt) || qtyInt <= 0) {
+      toast('Inserisci una quantità valida (numero intero positivo)', 'error');
+      return;
+    }
   } else {
     quantity = selQty.value;
     if (!quantity) { toast('Seleziona prodotto e quantità', 'error'); return; }
@@ -263,7 +302,7 @@ invoiceForm.addEventListener('submit', async (e) => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
-    toast(`✅ Fattura registrata: ${fmt$(data.invoice.price)}`, 'success');
+    toast(productType === 'E' ? '✅ Coupon registrato' : `✅ Fattura registrata: ${fmt$(data.invoice.price)}`, 'success');
 
     invoiceForm.reset();
     selQty.disabled = true;

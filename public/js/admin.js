@@ -36,7 +36,8 @@ const PROD_NAMES = {
   A: 'Combo cibo',
   B: 'Antistress singolo',
   C: 'Combo cibo antistress',
-  D: 'Personalizzata'
+  D: 'Personalizzata',
+  E: 'Coupon'
 };
 
 function qtyPill(type, qty)  { return `<span class="qty-pill">${(QTY_FMT[type]??((n)=>n))(qty)}</span>`; }
@@ -100,6 +101,7 @@ async function loadActivities() {
 }
 
 function displayPrice(invoice) {
+  if (invoice.productType === 'E') return '–';
   return invoice.discountAmount
     ? `<s class="text-muted">${fmt$(invoice.originalPrice)}</s> ${fmt$(invoice.price)} <span class="badge badge-success">-${invoice.discountPercentage}%</span>`
     : fmt$(invoice.price);
@@ -346,7 +348,7 @@ function renderEmployeeStats() {
   const sorted = [...stats.employees].sort((a,b) => b.totalInvoices - a.totalInvoices);
 
   if (!sorted.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="fa-solid fa-users"></i><p>Nessun dipendente registrato</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><i class="fa-solid fa-users"></i><p>Nessun dipendente registrato</p></div></td></tr>`;
     return;
   }
 
@@ -368,6 +370,7 @@ function renderEmployeeStats() {
           <span>%</span>
         </label>
       </td>
+      <td><strong>${emp.payableCoupons ?? 0}</strong> <span class="text-muted" style="font-size:.8rem;">(${emp.totalCoupons ?? 0} tot)</span></td>
       <td class="price-cell text-success">${fmt$(emp.amountDue)}</td>
       <td>${emp.todayInvoices}</td>
       <td style="color:var(--accent);font-weight:700;">${fmt$(emp.todayAmount)}</td>

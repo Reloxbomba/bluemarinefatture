@@ -40,8 +40,20 @@ const PRODUCTS = {
   A: { id: 'A', name: 'Combo cibo', format: 'NxN',    prices: {1:600,2:1200,3:1800,4:2400,5:3000,6:3600,7:4200,8:4800,9:5400,10:6000,15:9000,20:12000} },
   B: { id: 'B', name: 'Antistress singolo', format: 'N',      prices: {1:350,2:700,3:1050,4:1400,5:1750,6:2100,7:2450,8:2800,9:3150,10:3500,15:5250,20:7000} },
   C: { id: 'C', name: 'Combo cibo antistress', format: 'NxNxN',  prices: {1:950,2:1900,3:2850,4:3800,5:4750,6:5700,7:6650,8:7600,9:8550,10:9500,15:14250,20:19000} },
-  D: { id: 'D', name: 'Personalizzata', format: 'custom', prices: null } // quantità e prezzo liberi
+  D: { id: 'D', name: 'Personalizzata', format: 'custom', prices: null }, // quantità e prezzo liberi
+  E: { id: 'E', name: 'Coupon', format: 'custom_qty', prices: null } // quantità manuale, prezzo invisibile per il dipendente (ogni coupon vale 200 nel calcolo admin)
 };
+
+// Helper per ottenere la data YYYY-MM-DD nel fuso orario italiano
+function getLocalDateString(dateInput = new Date()) {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Rome',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+}
 
 // ══════════════════════════════════════════════════════════════════
 // AUTH
@@ -97,13 +109,18 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
   let finalPrice;
 
   if (productType === 'D') {
-    // Categoria D: quantità e prezzo liberi
+    // Categoria D: Personalizzata (quantità e prezzo liberi)
     if (!qty || qty.length > 100)
       return res.status(400).json({ error: 'Quantità non valida (1-100 caratteri)' });
     const pMan = parseFloat(manualPrice);
     if (isNaN(pMan) || pMan <= 0)
       return res.status(400).json({ error: 'Prezzo non valido' });
     finalPrice = Math.round(pMan * 100) / 100;
+  } else if (productType === 'E') {
+    // Categoria E: Coupon (quantità manuale, prezzo 0)
+    if (isNaN(qty) || qty <= 0)
+      return res.status(400).json({ error: 'Quantità coupon non valida' });
+    finalPrice = 0;
   } else {
     if (!Object.prototype.hasOwnProperty.call(product.prices, qty))
       return res.status(400).json({ error: 'Dati non validi' });
@@ -181,8 +198,8 @@ app.delete('/api/invoices/:id', requireAdmin, async (req, res) => {
 app.get('/api/stats', requireAdmin, async (req, res) => {
   const invoices  = await readJSON(INVOICES_FILE);
   const users     = await readJSON(USERS_FILE);
-  const today     = new Date().toISOString().slice(0, 10);
-  const todayList = invoices.filter(i => i.createdAt.startsWith(today));
+  const today     = getLocalDateString();
+  const todayList = invoices.filter(i => getLocalDateString(i.createdAt) === today);
 
   const employeeStats = users.filter(u => u.role === 'employee').map(emp => {
     const empAll   = invoices.filter(i => i.employeeId === emp.id);
@@ -190,10 +207,22 @@ app.get('/api/stats', requireAdmin, async (req, res) => {
     const payableInvoices = salaryResetAt
       ? empAll.filter(i => i.createdAt > salaryResetAt)
       : empAll;
-    const empToday = empAll.filter(i => i.createdAt.startsWith(today));
+    const empToday = empAll.filter(i => getLocalDateString(i.createdAt) === today);
     const commissionPercentage = Number.isFinite(Number(emp.commissionPercentage))
       ? Number(emp.commissionPercentage)
       : 0;
+
+    const totalCoupons = empAll
+      .filter(i => i.productType === 'E')
+      .reduce((s, i) => s + (parseInt(i.quantity, 10) || 0), 0);
+
+    const payableCoupons = payableInvoices
+      .filter(i => i.productType === 'E')
+      .reduce((s, i) => s + (parseInt(i.quantity, 10) || 0), 0);
+
+    const couponPay = payableCoupons * 200;
+    const commissionPay = Math.round(payableInvoices.reduce((s, i) => s + i.price, 0) * commissionPercentage) / 100;
+
     return {
       id:            emp.id,
       username:      emp.username,
@@ -201,7 +230,9 @@ app.get('/api/stats', requireAdmin, async (req, res) => {
       totalInvoices: empAll.length,
       totalAmount:   empAll.reduce((s, i) => s + i.price, 0),
       payableAmount:  payableInvoices.reduce((s, i) => s + i.price, 0),
-      amountDue:     Math.round(payableInvoices.reduce((s, i) => s + i.price, 0) * commissionPercentage) / 100,
+      amountDue:     commissionPay + couponPay,
+      totalCoupons,
+      payableCoupons,
       salaryResetAt,
       todayInvoices: empToday.length,
       todayAmount:   empToday.reduce((s, i) => s + i.price, 0),
@@ -383,6 +414,7 @@ app.get('/api/export/csv', requireAdmin, async (req, res) => {
 // ──────────────────────────────────────────────────────────────────
 async function start() {
   await initStorage();
+
   if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET)
     throw new Error('SESSION_SECRET è obbligatoria in produzione');
 
