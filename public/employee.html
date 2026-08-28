@@ -96,92 +96,127 @@
     <!-- Content Grid -->
     <div class="content-grid">
 
-      <!-- ── Invoice Form ───────────────────────────────────── -->
-      <div class="card fade-in" style="animation-delay:.22s">
-        <div class="card-header">
-          <h3><i class="fa-solid fa-plus-circle text-accent"></i>&nbsp; Nuova Fattura</h3>
-        </div>
-        <div class="card-body">
-          <form id="invoice-form" style="display:flex;flex-direction:column;gap:1.1rem;" novalidate>
+      <!-- Colonna Sinistra: Nuova Fattura + Storico Pagamenti -->
+      <div style="display:flex; flex-direction:column; gap:1.5rem;">
+        <!-- ── Invoice Form ───────────────────────────────────── -->
+        <div class="card fade-in" style="animation-delay:.22s">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-plus-circle text-accent"></i>&nbsp; Nuova Fattura</h3>
+          </div>
+          <div class="card-body">
+            <form id="invoice-form" style="display:flex;flex-direction:column;gap:1.1rem;" novalidate>
 
-            <div class="form-group">
-              <label class="form-label">👤 Nome Cliente</label>
-              <input
-                type="text" id="client-name" class="form-control"
-                placeholder="Es. Marco Rossi (lascia vuoto per Anonimo)"
-                maxlength="100"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label" for="client-activity">🏢 Attività del cliente</label>
-              <select id="client-activity" class="form-control">
-                <option value="">Nessuna convenzione</option>
-              </select>
-              <span class="text-muted" id="discount-hint">Se il cliente lavora in un’attività convenzionata, selezionala qui.</span>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">📦 Prodotto</label>
-              <select id="product-type" class="form-control" required>
-                <option value="">— Seleziona prodotto —</option>
-                <option value="A">Combo cibo</option>
-                <option value="B">Antistress singolo</option>
-                <option value="C">Combo cibo antistress</option>
-                <option value="D">Personalizzata</option>
-                <option value="E">Coupon</option>
-              </select>
-            </div>
-
-            <div class="form-group" id="qty-select-group">
-              <label class="form-label">🔢 Quantità</label>
-              <select id="quantity" class="form-control" required disabled>
-                <option value="">— Prima seleziona un prodotto —</option>
-              </select>
-            </div>
-
-            <!-- Categoria D: campi manuali -->
-            <div id="cat-d-fields" style="display:none; flex-direction:column; gap:1.1rem;">
               <div class="form-group">
+                <label class="form-label">👤 Nome Cliente</label>
+                <input
+                  type="text" id="client-name" class="form-control"
+                  placeholder="Es. Marco Rossi (lascia vuoto per Anonimo)"
+                  maxlength="100"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="client-activity">🏢 Attività del cliente</label>
+                <select id="client-activity" class="form-control">
+                  <option value="">Nessuna convenzione</option>
+                </select>
+                <span class="text-muted" id="discount-hint">Se il cliente lavora in un’attività convenzionata, selezionala qui.</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">📦 Prodotto</label>
+                <select id="product-type" class="form-control" required>
+                  <option value="">— Seleziona prodotto —</option>
+                  <option value="A">Combo cibo</option>
+                  <option value="B">Antistress singolo</option>
+                  <option value="C">Combo cibo antistress</option>
+                  <option value="D">Personalizzata</option>
+                  <option value="E">Coupon</option>
+                </select>
+              </div>
+
+              <div class="form-group" id="qty-select-group">
                 <label class="form-label">🔢 Quantità</label>
-                <input
-                  type="text" id="manual-quantity" class="form-control"
-                  placeholder="Es. 5, -- oppure xxx" maxlength="100"
-                />
+                <select id="quantity" class="form-control" required disabled>
+                  <option value="">— Prima seleziona un prodotto —</option>
+                </select>
               </div>
-              <div class="form-group" id="manual-price-group">
-                <label class="form-label">💶 Prezzo (€)</label>
-                <input
-                  type="number" id="manual-price" class="form-control"
-                  placeholder="Es. 150.00" min="0.01" step="0.01"
-                />
+
+              <!-- Categoria D: campi manuali -->
+              <div id="cat-d-fields" style="display:none; flex-direction:column; gap:1.1rem;">
+                <div class="form-group">
+                  <label class="form-label">🔢 Quantità</label>
+                  <input
+                    type="text" id="manual-quantity" class="form-control"
+                    placeholder="Es. 5, -- oppure xxx" maxlength="100"
+                  />
+                </div>
+                <div class="form-group" id="manual-price-group">
+                  <label class="form-label">💶 Prezzo (€)</label>
+                  <input
+                    type="number" id="manual-price" class="form-control"
+                    placeholder="Es. 150.00" min="0.01" step="0.01"
+                  />
+                </div>
               </div>
-            </div>
 
-            <!-- Price Preview -->
-            <div class="price-display" id="price-display">
-              <div class="amount" id="price-amount">–</div>
-              <div class="currency-label" id="price-label">Importo Fattura</div>
-              <div class="text-success hidden" id="discount-preview"></div>
-            </div>
+              <!-- Price Preview -->
+              <div class="price-display" id="price-display">
+                <div class="amount" id="price-amount">–</div>
+                <div class="currency-label" id="price-label">Importo Fattura</div>
+                <div class="text-success hidden" id="discount-preview"></div>
+              </div>
 
-            <div class="form-group">
-              <label class="form-label">📝 Note <span style="opacity:.5;font-weight:400;text-transform:none;">(opzionale)</span></label>
-              <textarea
-                id="invoice-notes" class="form-control"
-                placeholder="Note aggiuntive..."
-                maxlength="500" rows="3"
-              ></textarea>
-            </div>
+              <div class="form-group">
+                <label class="form-label">📝 Note <span style="opacity:.5;font-weight:400;text-transform:none;">(opzionale)</span></label>
+                <textarea
+                  id="invoice-notes" class="form-control"
+                  placeholder="Note aggiuntive..."
+                  maxlength="500" rows="3"
+                ></textarea>
+              </div>
 
-            <button type="submit" class="btn btn-success btn-lg" id="submit-btn">
-              <i class="fa-solid fa-circle-check"></i> Registra Fattura
-            </button>
+              <button type="submit" class="btn btn-success btn-lg" id="submit-btn">
+                <i class="fa-solid fa-circle-check"></i> Registra Fattura
+              </button>
 
-          </form>
+            </form>
+          </div>
+        </div>
+
+        <!-- ── My Payments ─────────────────────────────────────── -->
+        <div class="card fade-in" style="animation-delay:.42s">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-receipt text-success"></i>&nbsp; Storico Pagamenti Ricevuti</h3>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data Liquidazione</th>
+                  <th>Importo Ricevuto</th>
+                  <th>Fatturato Liquidato</th>
+                  <th>Coupon Pagate</th>
+                  <th>% Commissione</th>
+                  <th>Periodo Riferimento</th>
+                </tr>
+              </thead>
+              <tbody id="my-payments-body">
+                <tr>
+                  <td colspan="6">
+                    <div class="empty-state">
+                      <i class="fa-solid fa-receipt"></i>
+                      <p>Nessun pagamento ancora liquidato</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
+      <!-- Colonna Destra: Le Mie Fatture -->
       <!-- ── My Invoices ─────────────────────────────────────── -->
       <div class="card fade-in" style="animation-delay:.32s">
         <div class="card-header">
@@ -207,37 +242,6 @@
                   <div class="empty-state">
                     <i class="fa-solid fa-inbox"></i>
                     <p>Nessuna fattura ancora registrata</p>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ── My Payments ─────────────────────────────────────── -->
-      <div class="card fade-in" style="animation-delay:.42s">
-        <div class="card-header">
-          <h3><i class="fa-solid fa-receipt text-success"></i>&nbsp; Storico Pagamenti Ricevuti</h3>
-        </div>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Data Liquidazione</th>
-                <th>Importo Ricevuto</th>
-                <th>Fatturato Liquidato</th>
-                <th>Coupon Pagate</th>
-                <th>% Commissione</th>
-                <th>Periodo Riferimento</th>
-              </tr>
-            </thead>
-            <tbody id="my-payments-body">
-              <tr>
-                <td colspan="6">
-                  <div class="empty-state">
-                    <i class="fa-solid fa-receipt"></i>
-                    <p>Nessun pagamento ancora liquidato</p>
                   </div>
                 </td>
               </tr>
