@@ -101,7 +101,7 @@
         <!-- ── Invoice Form ───────────────────────────────────── -->
         <div class="card fade-in" style="animation-delay:.22s">
           <div class="card-header">
-            <h3><i class="fa-solid fa-plus-circle text-accent"></i>&nbsp; Nuova Fattura</h3>
+            <h3 id="form-title"><i class="fa-solid fa-plus-circle text-accent"></i>&nbsp; Nuova Fattura</h3>
           </div>
           <div class="card-body">
             <form id="invoice-form" style="display:flex;flex-direction:column;gap:1.1rem;" novalidate>
@@ -176,9 +176,14 @@
                 ></textarea>
               </div>
 
-              <button type="submit" class="btn btn-success btn-lg" id="submit-btn">
-                <i class="fa-solid fa-circle-check"></i> Registra Fattura
-              </button>
+              <div style="display:flex; gap:0.75rem; width:100%;">
+                <button type="submit" class="btn btn-success btn-lg" id="submit-btn" style="flex:1;">
+                  <i class="fa-solid fa-circle-check"></i> Registra Fattura
+                </button>
+                <button type="button" class="btn btn-ghost btn-lg hidden" id="cancel-edit-btn" style="flex:1;">
+                  Annulla
+                </button>
+              </div>
 
             </form>
           </div>

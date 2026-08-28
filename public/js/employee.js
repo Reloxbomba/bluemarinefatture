@@ -7,6 +7,7 @@ let currentUser = null;
 let myInvoices  = [];
 let activities  = [];
 let myPayments  = [];
+let editingInvoiceId = null;
 
 // ─── Utils ────────────────────────────────────────────────────────
 const fmt$  = (n) => '$' + Number(n).toLocaleString('it-IT');
@@ -118,9 +119,14 @@ function renderInvoices() {
   tbody.innerHTML = myInvoices.map(inv => {
     const timeDiffMins = (new Date() - new Date(inv.createdAt)) / (1000 * 60);
     const canDelete = timeDiffMins <= 15;
+    const canEdit = timeDiffMins <= 15;
     
     const deleteBtn = canDelete 
       ? `<button class="btn btn-danger btn-sm btn-icon" onclick="stornoInvoice('${inv.id}')" title="Storna/Annulla fattura" style="margin-left: 5px;"><i class="fa-solid fa-trash"></i></button>`
+      : '';
+
+    const editBtn = canEdit 
+      ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="editInvoice('${inv.id}')" title="Modifica fattura" style="margin-left: 5px;"><i class="fa-solid fa-pencil"></i></button>`
       : '';
       
     const printBtn = `<button class="btn btn-ghost btn-sm btn-icon" onclick="printReceipt('${inv.id}')" title="Stampa ricevuta cliente"><i class="fa-solid fa-print"></i></button>`;
@@ -136,6 +142,7 @@ function renderInvoices() {
         <td>
           <div style="display:flex;gap:.3rem;justify-content:center;align-items:center;">
             ${printBtn}
+            ${editBtn}
             ${deleteBtn}
           </div>
         </td>
@@ -283,8 +290,12 @@ invoiceForm.addEventListener('submit', async (e) => {
     if (!quantity) { toast('Seleziona prodotto e quantità', 'error'); return; }
   }
 
+  const isEditing = editingInvoiceId !== null;
+  const url = isEditing ? `/api/invoices/my/${editingInvoiceId}` : '/api/invoices';
+  const method = isEditing ? 'PUT' : 'POST';
+
   const origHTML = submitBtn.innerHTML;
-  submitBtn.innerHTML = '<span class="spinner"></span> Registrazione...';
+  submitBtn.innerHTML = isEditing ? '<span class="spinner"></span> Salvataggio...' : '<span class="spinner"></span> Registrazione...';
   submitBtn.disabled  = true;
 
   try {
@@ -297,30 +308,34 @@ invoiceForm.addEventListener('submit', async (e) => {
     };
     if (productType === 'D') body.manualPrice = manualPrice;
 
-    const res  = await fetch('/api/invoices', {
-      method: 'POST',
+    const res  = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
-    toast(productType === 'E' ? '✅ Coupon registrato' : `✅ Fattura registrata: ${fmt$(data.invoice.price)}`, 'success');
-
-    invoiceForm.reset();
-    selQty.disabled = true;
-    selQty.innerHTML = '<option value="">— Prima seleziona un prodotto —</option>';
-    qtySelectGroup.style.display = '';
-    catDFields.style.display = 'none';
-    activitySelect.value = '';
-    discountHint.textContent = 'Se il cliente lavora in un’attività convenzionata, selezionala qui.';
-    discountPreview.classList.add('hidden');
-    priceAmt.textContent = '–';
-    priceDisp.classList.remove('active');
+    if (isEditing) {
+      toast('✅ Fattura modificata con successo', 'success');
+      cancelEdit();
+    } else {
+      toast(productType === 'E' ? '✅ Coupon registrato' : `✅ Fattura registrata: ${fmt$(data.invoice.price)}`, 'success');
+      invoiceForm.reset();
+      selQty.disabled = true;
+      selQty.innerHTML = '<option value="">— Prima seleziona un prodotto —</option>';
+      qtySelectGroup.style.display = '';
+      catDFields.style.display = 'none';
+      activitySelect.value = '';
+      discountHint.textContent = 'Se il cliente lavora in un’attività convenzionata, selezionala qui.';
+      discountPreview.classList.add('hidden');
+      priceAmt.textContent = '–';
+      priceDisp.classList.remove('active');
+    }
 
     await loadMyInvoices();
   } catch (err) {
-    toast(err.message || 'Errore durante la registrazione', 'error');
+    toast(err.message || 'Errore durante l\'operazione', 'error');
   } finally {
     submitBtn.innerHTML = origHTML;
     submitBtn.disabled  = false;
@@ -564,8 +579,79 @@ function printReceipt(id) {
   w.document.close();
 }
 
+function editInvoice(id) {
+  const inv = myInvoices.find(i => i.id === id);
+  if (!inv) return;
+
+  const timeDiffMins = (new Date() - new Date(inv.createdAt)) / (1000 * 60);
+  if (timeDiffMins > 15) {
+    toast('Tempo scaduto: puoi modificare una fattura solo entro 15 minuti', 'error');
+    return;
+  }
+
+  editingInvoiceId = id;
+  
+  // Imposta i campi
+  document.getElementById('client-name').value = inv.clientName === 'Anonimo' ? '' : inv.clientName;
+  document.getElementById('client-activity').value = inv.activityId || '';
+  
+  selProduct.value = inv.productType;
+  selProduct.dispatchEvent(new Event('change'));
+  
+  if (inv.productType === 'D') {
+    manualQtyInp.value = inv.quantity;
+    manualPriceInp.value = inv.originalPrice;
+  } else if (inv.productType === 'E') {
+    manualQtyInp.value = inv.quantity;
+  } else {
+    selQty.value = inv.quantity;
+  }
+  
+  document.getElementById('invoice-notes').value = inv.notes || '';
+  
+  // Aggiorna prezzi
+  updatePricePreview(inv.originalPrice);
+
+  // Cambia UI del form in "Modifica"
+  document.getElementById('form-title').innerHTML = '<i class="fa-solid fa-pencil text-accent"></i>&nbsp; Modifica Fattura';
+  submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Salva Modifiche';
+  submitBtn.className = 'btn btn-primary btn-lg';
+  submitBtn.style.flex = '1';
+  document.getElementById('cancel-edit-btn').classList.remove('hidden');
+
+  // Scorri fino al form
+  document.getElementById('invoice-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelEdit() {
+  editingInvoiceId = null;
+  invoiceForm.reset();
+  
+  // Ripristina select
+  selQty.disabled = true;
+  selQty.innerHTML = '<option value="">— Prima seleziona un prodotto —</option>';
+  qtySelectGroup.style.display = '';
+  catDFields.style.display = 'none';
+  activitySelect.value = '';
+  discountHint.textContent = 'Se il cliente lavora in un’attività convenzionata, selezionala qui.';
+  discountPreview.classList.add('hidden');
+  priceAmt.textContent = '–';
+  priceDisp.classList.remove('active');
+
+  // Ripristina UI del form in "Nuova Fattura"
+  document.getElementById('form-title').innerHTML = '<i class="fa-solid fa-plus-circle text-accent"></i>&nbsp; Nuova Fattura';
+  submitBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Registra Fattura';
+  submitBtn.className = 'btn btn-success btn-lg';
+  submitBtn.style.flex = '1';
+  document.getElementById('cancel-edit-btn').classList.add('hidden');
+}
+
 window.stornoInvoice = stornoInvoice;
 window.printReceipt = printReceipt;
+window.editInvoice = editInvoice;
+window.cancelEdit = cancelEdit;
+
+document.getElementById('cancel-edit-btn').addEventListener('click', cancelEdit);
 
 // ─── Start ────────────────────────────────────────────────────────
 init();

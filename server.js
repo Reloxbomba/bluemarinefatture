@@ -536,6 +536,76 @@ app.delete('/api/invoices/my/:id', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// Employee: edit invoice (within 15 mins)
+app.put('/api/invoices/my/:id', requireAuth, async (req, res) => {
+  const invoices = await readJSON(INVOICES_FILE);
+  const invoice = invoices.find(i => i.id === req.params.id);
+  if (!invoice) return res.status(404).json({ error: 'Fattura non trovata' });
+
+  if (invoice.employeeId !== req.session.user.id) {
+    return res.status(403).json({ error: 'Accesso negato: puoi modificare solo le tue fatture' });
+  }
+
+  const timeDiffMins = (new Date() - new Date(invoice.createdAt)) / (1000 * 60);
+  if (timeDiffMins > 15) {
+    return res.status(400).json({ error: 'Tempo scaduto: puoi modificare una fattura solo entro 15 minuti' });
+  }
+
+  const { clientName, productType, quantity, notes, manualPrice, activityId } = req.body;
+  const products = await readJSON(PRODUCTS_FILE);
+  const product = products[productType];
+  if (!product) return res.status(400).json({ error: 'Prodotto non valido' });
+
+  const qty = productType === 'D'
+    ? String(quantity ?? '').trim()
+    : parseInt(quantity, 10);
+
+  let finalPrice;
+  if (productType === 'D') {
+    if (!qty || qty.length > 100)
+      return res.status(400).json({ error: 'Quantità non valida (1-100 caratteri)' });
+    const pMan = parseFloat(manualPrice);
+    if (isNaN(pMan) || pMan <= 0)
+      return res.status(400).json({ error: 'Prezzo non valido' });
+    finalPrice = Math.round(pMan * 100) / 100;
+  } else if (productType === 'E') {
+    if (isNaN(qty) || qty <= 0)
+      return res.status(400).json({ error: 'Quantità coupon non valida' });
+    finalPrice = 0;
+  } else {
+    if (!Object.prototype.hasOwnProperty.call(product.prices, qty))
+      return res.status(400).json({ error: 'Dati non validi' });
+    finalPrice = product.prices[qty];
+  }
+
+  let activity = null;
+  let discountPercentage = 0;
+  if (activityId) {
+    const activities = await readJSON(ACTIVITIES_FILE);
+    activity = activities.find(item => item.id === activityId && item.active !== false);
+    if (!activity) return res.status(400).json({ error: 'Attività non valida o non più disponibile' });
+    discountPercentage = Number(activity.discountPercentage);
+  }
+  const discountAmount = Math.round(finalPrice * discountPercentage) / 100;
+  const discountedPrice = Math.round((finalPrice - discountAmount) * 100) / 100;
+
+  invoice.clientName = (clientName || 'Anonimo').trim().substring(0, 100);
+  invoice.productType = productType;
+  invoice.productName = product.name;
+  invoice.productFormat = product.format;
+  invoice.quantity = qty;
+  invoice.originalPrice = finalPrice;
+  invoice.discountPercentage = discountPercentage;
+  invoice.discountAmount = discountAmount;
+  invoice.activityId = activity?.id || null;
+  invoice.activityName = activity?.name || null;
+  invoice.price = discountedPrice;
+  invoice.notes = (notes || '').trim().substring(0, 500);
+
+  await writeJSON(INVOICES_FILE, invoices);
+  res.json({ success: true, invoice });
+});
+
 // ══════════════════════════════════════════════════════════════════
 // PAYMENTS
 // ══════════════════════════════════════════════════════════════════
