@@ -137,6 +137,44 @@
     </div>
   </div>
 
+  <!-- ══ MODAL: Aggiungi/Modifica Prodotto ═══════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-product">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-box text-accent"></i>&nbsp; <span id="product-modal-title">Nuovo Prodotto</span></h3>
+        <button class="btn btn-ghost btn-icon" id="product-modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="prod-id">Codice ID Prodotto (es. F, G, H)</label>
+          <input type="text" id="prod-id" class="form-control" placeholder="Es. F" maxlength="10" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="prod-name">Nome Prodotto</label>
+          <input type="text" id="prod-name" class="form-control" placeholder="Es. Combo Relax" maxlength="100" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="prod-format">Formato Quantità</label>
+          <select id="prod-format" class="form-control">
+            <option value="N">N (quantità singola, es. 1, 2, 3)</option>
+            <option value="NxN">NxN (formato cibo, es. 2x2, 5x5)</option>
+            <option value="NxNxN">NxNxN (formato cibo + antistress, es. 2x2x2)</option>
+            <option value="custom">custom (quantità libera come testo, prezzo inserito a mano)</option>
+            <option value="custom_qty">custom_qty (quantità libera come numero, prezzo 0 / coupon)</option>
+          </select>
+        </div>
+        <div class="form-group" id="prod-prices-group">
+          <label class="form-label">Prezzi per quantità (€) <span style="font-size:0.8rem; opacity:0.7;">(Formato: `quantità:prezzo`, es. `1:350, 2:700, 5:1750`)</span></label>
+          <textarea id="prod-prices" class="form-control" rows="3" placeholder="Es. 1:600, 2:1200, 5:3000, 10:6000"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="product-modal-cancel">Annulla</button>
+        <button class="btn btn-primary" id="product-modal-save"><i class="fa-solid fa-check"></i> Salva Prodotto</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ HEADER ═══════════════════════════════════════════════════ -->
   <header class="page-header">
     <div class="header-logo">
@@ -183,6 +221,12 @@
       </button>
       <button class="tab-btn" data-tab="activities">
         <i class="fa-solid fa-building"></i> Attività e sconti
+      </button>
+      <button class="tab-btn" data-tab="products">
+        <i class="fa-solid fa-box"></i> Prodotti
+      </button>
+      <button class="tab-btn" data-tab="payments">
+        <i class="fa-solid fa-receipt"></i> Pagamenti
       </button>
     </div>
 
@@ -357,6 +401,61 @@
           <table>
             <thead><tr><th>Attività</th><th>Sconto</th><th>Creata il</th><th>Azioni</th></tr></thead>
             <tbody id="activities-body"><tr><td colspan="4" class="text-center text-muted" style="padding:1.5rem">Caricamento...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TAB: Prodotti ────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-products">
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-box text-accent"></i>&nbsp; Gestione Catalogo Prodotti</h3>
+          <button class="btn btn-primary btn-sm" id="btn-add-product">
+            <i class="fa-solid fa-plus"></i> Nuovo Prodotto
+          </button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Codice ID</th>
+                <th>Nome Prodotto</th>
+                <th>Formato Quantità</th>
+                <th>Listino Prezzi (€)</th>
+                <th>Azioni</th>
+              </tr>
+            </thead>
+            <tbody id="products-body">
+              <tr><td colspan="5" class="text-center text-muted" style="padding:1.5rem">Caricamento...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TAB: Pagamenti ────────────────────────────────────────── -->
+    <div class="tab-pane" id="tab-payments">
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-receipt text-accent"></i>&nbsp; Storico Pagamenti Dipendenti</h3>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Data Pagamento</th>
+                <th>Dipendente</th>
+                <th>Importo Liquidato</th>
+                <th>Fatturato Periodo</th>
+                <th>Coupon Saldate</th>
+                <th>% Commissione</th>
+                <th>Periodo di Riferimento</th>
+              </tr>
+            </thead>
+            <tbody id="payments-body">
+              <tr><td colspan="7" class="text-center text-muted" style="padding:1.5rem">Caricamento...</td></tr>
+            </tbody>
           </table>
         </div>
       </div>

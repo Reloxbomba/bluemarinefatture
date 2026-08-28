@@ -5,13 +5,16 @@ let currentUser  = null;
 let allInvoices  = [];
 let allUsers     = [];
 let allActivities = [];
+let allProducts  = {};
+let allPayments  = [];
 let stats        = null;
 let resetTargetId   = null;
-let deleteTarget    = null; // { id, name, type: 'user'|'invoice' }
+let deleteTarget    = null; // { id, name, type: 'user'|'invoice'|'product' }
 let salaryTarget    = null;
 let empChart     = null;
 let prodChart    = null;
 let activityTargetId = null;
+let productTargetId = null;
 
 // ─── Utils ────────────────────────────────────────────────────────
 const fmt$  = (n) => '$' + Number(n).toLocaleString('it-IT');
@@ -31,17 +34,21 @@ function toast(msg, type = 'info') {
   setTimeout(() => { el.classList.add('toast-out'); setTimeout(() => el.remove(), 300); }, 3800);
 }
 
-const QTY_FMT = { A: (n)=>`${n}×${n}`, B: (n)=>`${n}`, C: (n)=>`${n}×${n}×${n}` };
-const PROD_NAMES = {
-  A: 'Combo cibo',
-  B: 'Antistress singolo',
-  C: 'Combo cibo antistress',
-  D: 'Personalizzata',
-  E: 'Coupon'
-};
-
-function qtyPill(type, qty)  { return `<span class="qty-pill">${(QTY_FMT[type]??((n)=>n))(qty)}</span>`; }
-function prodBadge(type)     { return `<span class="badge badge-${type}">${PROD_NAMES[type]||type}</span>`; }
+function getProdName(type) {
+  return allProducts[type]?.name || type;
+}
+function formatQty(type, qty) {
+  const p = allProducts[type];
+  if (!p) return qty;
+  if (p.format === 'NxN') return `${qty}×${qty}`;
+  if (p.format === 'NxNxN') return `${qty}×${qty}×${qty}`;
+  return qty;
+}
+function qtyPill(type, qty)  { return `<span class="qty-pill">${formatQty(type, qty)}</span>`; }
+function prodBadge(type)     {
+  const b = { A:'badge-A', B:'badge-B', C:'badge-C', D:'badge-D', E:'badge-E' };
+  return `<span class="badge ${b[type] || 'badge-accent'}">${getProdName(type)}</span>`;
+}
 function roleBadge(role)     {
   return role === 'admin'
     ? '<span class="badge badge-admin">👑 Admin</span>'
@@ -74,12 +81,15 @@ function hideLoader() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadStats(), loadInvoices(), loadUsers(), loadActivities()]);
+  await Promise.all([loadStats(), loadInvoices(), loadUsers(), loadActivities(), loadProducts(), loadPayments()]);
   renderOverview();
+  populateProductFilter();
   const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
   if (activeTab === 'employees') renderEmployeeStats();
   if (activeTab === 'users') renderUsers();
   if (activeTab === 'activities') renderActivities();
+  if (activeTab === 'products') renderProducts();
+  if (activeTab === 'payments') renderPayments();
 }
 
 // ─── Data Fetching ────────────────────────────────────────────────
@@ -98,6 +108,23 @@ async function loadUsers() {
 async function loadActivities() {
   const res = await fetch('/api/admin/activities');
   allActivities = await res.json();
+}
+async function loadProducts() {
+  const res = await fetch('/api/admin/products');
+  allProducts = await res.json();
+}
+async function loadPayments() {
+  const res = await fetch('/api/payments');
+  allPayments = await res.json();
+}
+
+function populateProductFilter() {
+  const sel = document.getElementById('f-product');
+  if (!sel) return;
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">Tutti i prodotti</option>' +
+    Object.values(allProducts).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  sel.value = currentVal;
 }
 
 function displayPrice(invoice) {
@@ -600,6 +627,13 @@ document.getElementById('modal-del-confirm').addEventListener('click', async () 
       renderUsers();
       renderEmployeeStats();
       populateEmployeeFilter();
+    } else if (deleteTarget.type === 'product') {
+      res = await fetch(`/api/admin/products/${deleteTarget.id}`, { method: 'DELETE' });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      toast('Prodotto eliminato', 'success');
+      await loadProducts();
+      renderProducts();
+      populateProductFilter();
     } else {
       res = await fetch(`/api/invoices/${deleteTarget.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Errore eliminazione');
@@ -628,6 +662,10 @@ function switchTab(name) {
     renderUsers();
   } else if (name === 'activities') {
     renderActivities();
+  } else if (name === 'products') {
+    renderProducts();
+  } else if (name === 'payments') {
+    renderPayments();
   } else if (name === 'overview') {
     setTimeout(renderCharts, 80);
   }
@@ -639,11 +677,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 setInterval(async () => {
   if (!currentUser) return;
-  await Promise.all([loadStats(), loadInvoices(), loadUsers(), loadActivities()]);
+  await Promise.all([loadStats(), loadInvoices(), loadUsers(), loadActivities(), loadProducts(), loadPayments()]);
   const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
   if (activeTab === 'employees') renderEmployeeStats();
   if (activeTab === 'overview') renderOverview();
   if (activeTab === 'activities') renderActivities();
+  if (activeTab === 'products') renderProducts();
+  if (activeTab === 'payments') renderPayments();
 }, 15000);
 
 // ─── Filters ──────────────────────────────────────────────────────
@@ -661,6 +701,170 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   await fetch('/api/auth/logout', { method: 'POST' });
   window.location.href = '/';
 });
+
+// ─── Products CRUD & Render ───────────────────────────────────────
+function renderProducts() {
+  const tbody = document.getElementById('products-body');
+  if (!tbody) return;
+  const list = Object.values(allProducts);
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-box"></i><p>Nessun prodotto a catalogo</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(prod => {
+    let pricesStr = '–';
+    if (prod.prices && typeof prod.prices === 'object') {
+      pricesStr = Object.entries(prod.prices).map(([q, p]) => `${q}:${fmt$(p)}`).join(', ');
+    }
+    return `
+      <tr>
+        <td><strong>${prod.id}</strong></td>
+        <td>${prod.name}</td>
+        <td><span class="badge" style="background:rgba(255,255,255,0.06);color:var(--text-1);border:1px solid var(--border);">${prod.format}</span></td>
+        <td style="font-size:0.85rem;color:var(--text-2);max-width:300px;word-break:break-all;">${pricesStr}</td>
+        <td>
+          <div style="display:flex;gap:.4rem;align-items:center;">
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="openProductModal('${prod.id}')" title="Modifica prodotto"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn btn-danger btn-sm btn-icon" onclick="openDeleteProduct('${prod.id}', '${prod.name.replace(/'/g, "\\'")}')" title="Elimina prodotto"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function openProductModal(id = null) {
+  productTargetId = id;
+  const prod = allProducts[id];
+  document.getElementById('product-modal-title').textContent = prod ? 'Modifica prodotto' : 'Nuovo prodotto';
+  document.getElementById('prod-id').value = prod?.id || '';
+  document.getElementById('prod-id').disabled = prod ? true : false;
+  document.getElementById('prod-name').value = prod?.name || '';
+  document.getElementById('prod-format').value = prod?.format || 'N';
+  
+  let pricesText = '';
+  if (prod && prod.prices) {
+    pricesText = Object.entries(prod.prices).map(([q, p]) => `${q}:${p}`).join(', ');
+  }
+  document.getElementById('prod-prices').value = pricesText;
+  
+  togglePricesGroup(prod?.format || 'N');
+  document.getElementById('modal-product').classList.remove('hidden');
+  document.getElementById('prod-id').focus();
+}
+
+function closeProductModal() {
+  document.getElementById('modal-product').classList.add('hidden');
+  productTargetId = null;
+}
+
+function togglePricesGroup(format) {
+  const group = document.getElementById('prod-prices-group');
+  if (format === 'custom' || format === 'custom_qty') {
+    group.style.display = 'none';
+  } else {
+    group.style.display = 'block';
+  }
+}
+
+document.getElementById('prod-format').addEventListener('change', (e) => {
+  togglePricesGroup(e.target.value);
+});
+
+document.getElementById('btn-add-product').addEventListener('click', () => openProductModal());
+['product-modal-close', 'product-modal-cancel'].forEach(id => {
+  document.getElementById(id).addEventListener('click', closeProductModal);
+});
+document.getElementById('modal-product').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeProductModal();
+});
+
+document.getElementById('product-modal-save').addEventListener('click', async () => {
+  const id = document.getElementById('prod-id').value.trim().toUpperCase();
+  const name = document.getElementById('prod-name').value.trim();
+  const format = document.getElementById('prod-format').value;
+  const pricesRaw = document.getElementById('prod-prices').value.trim();
+
+  if (!id || !name || !format) {
+    toast('Compila tutti i campi obbligatori', 'error');
+    return;
+  }
+
+  let prices = null;
+  if (format !== 'custom' && format !== 'custom_qty') {
+    prices = {};
+    if (!pricesRaw) {
+      toast('Inserisci i prezzi per le quantità', 'error');
+      return;
+    }
+    const pairs = pricesRaw.split(',');
+    for (const pair of pairs) {
+      const parts = pair.split(':');
+      if (parts.length !== 2) {
+        toast('Formato prezzi non valido. Usa qty:prezzo, qty:prezzo', 'error');
+        return;
+      }
+      const qty = parseInt(parts[0].trim(), 10);
+      const price = parseFloat(parts[1].trim());
+      if (isNaN(qty) || isNaN(price) || qty <= 0 || price < 0) {
+        toast('Valori quantità o prezzo non validi', 'error');
+        return;
+      }
+      prices[qty] = price;
+    }
+  }
+
+  const body = { id, name, format, prices };
+  const method = productTargetId ? 'PUT' : 'POST';
+  const url = productTargetId ? `/api/admin/products/${productTargetId}` : '/api/admin/products';
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    toast(productTargetId ? 'Prodotto modificato' : 'Prodotto aggiunto', 'success');
+    closeProductModal();
+    await loadProducts();
+    renderProducts();
+    populateProductFilter();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+});
+
+function openDeleteProduct(id, name) {
+  deleteTarget = { id, name, type: 'product' };
+  document.getElementById('delete-target-name').textContent = `il prodotto "${name}" (ID: ${id})`;
+  document.getElementById('modal-confirm-delete').classList.remove('hidden');
+}
+
+window.openProductModal = openProductModal;
+window.openDeleteProduct = openDeleteProduct;
+
+// ─── Payments Render ──────────────────────────────────────────────
+function renderPayments() {
+  const tbody = document.getElementById('payments-body');
+  if (!tbody) return;
+  if (!allPayments.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="fa-solid fa-receipt"></i><p>Nessun pagamento registrato</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = allPayments.map(p => `
+    <tr>
+      <td><span style="color:var(--text-3);font-size:.82rem;">${fmtDT(p.paymentDate)}</span></td>
+      <td><strong>${p.employeeName}</strong></td>
+      <td class="price-cell text-success" style="font-weight:700;">${fmt$(p.amountPaid)}</td>
+      <td class="price-cell">${fmt$(p.payableAmount)}</td>
+      <td><strong>${p.payableCoupons}</strong></td>
+      <td>${p.commissionPercentage}%</td>
+      <td><span style="color:var(--text-2);font-size:0.8rem;">Da: ${fmtDT(p.periodFrom)}<br>A: ${fmtDT(p.periodTo)}</span></td>
+    </tr>
+  `).join('');
+}
 
 // ─── Start ────────────────────────────────────────────────────────
 init();

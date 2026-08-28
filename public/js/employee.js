@@ -1,37 +1,12 @@
 'use strict';
 
-// ─── Product catalog (mirrors server) ────────────────────────────
-const PRODUCTS = {
-  A: {
-    name: 'Combo cibo',
-    fmt:  (n) => `${n}×${n}`,
-    prices: {1:600,2:1200,3:1800,4:2400,5:3000,6:3600,7:4200,8:4800,9:5400,10:6000,15:9000,20:12000}
-  },
-  B: {
-    name: 'Antistress singolo',
-    fmt:  (n) => `${n}`,
-    prices: {1:350,2:700,3:1050,4:1400,5:1750,6:2100,7:2450,8:2800,9:3150,10:3500,15:5250,20:7000}
-  },
-  C: {
-    name: 'Combo cibo antistress',
-    fmt:  (n) => `${n}×${n}×${n}`,
-    prices: {1:950,2:1900,3:2850,4:3800,5:4750,6:5700,7:6650,8:7600,9:8550,10:9500,15:14250,20:19000}
-  },
-  D: {
-    name: 'Personalizzata',
-    fmt:  (n) => `${n}`,
-    prices: null  // manuale
-  },
-  E: {
-    name: 'Coupon',
-    fmt:  (n) => `${n}`,
-    prices: null
-  }
-};
+// ─── Product catalog (loaded dynamically) ────────────────────────
+let PRODUCTS = {};
 
 let currentUser = null;
 let myInvoices  = [];
 let activities  = [];
+let myPayments  = [];
 
 // ─── Utils ────────────────────────────────────────────────────────
 const fmt$  = (n) => '$' + Number(n).toLocaleString('it-IT');
@@ -76,7 +51,10 @@ async function init() {
     document.getElementById('user-name').textContent   = user.username;
     document.getElementById('user-avatar').textContent = user.username[0].toUpperCase();
 
-    await Promise.all([loadActivities(), loadMyInvoices()]);
+    const prodRes = await fetch('/api/products');
+    PRODUCTS = await prodRes.json();
+
+    await Promise.all([loadActivities(), loadMyInvoices(), loadMyPayments()]);
     hideLoader();
   } catch {
     window.location.href = '/';
@@ -121,24 +99,49 @@ function updateStats() {
   document.getElementById('invoices-badge').textContent    = `${myInvoices.length} fatture`;
 }
 
+function formatQty(type, qty) {
+  const p = PRODUCTS[type];
+  if (!p) return qty;
+  if (p.format === 'NxN') return `${qty}×${qty}`;
+  if (p.format === 'NxNxN') return `${qty}×${qty}×${qty}`;
+  return qty;
+}
+
 function renderInvoices() {
   const tbody = document.getElementById('my-invoices-body');
   if (myInvoices.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
       <i class="fa-solid fa-inbox"></i><p>Nessuna fattura ancora registrata</p>
     </div></td></tr>`;
     return;
   }
-  tbody.innerHTML = myInvoices.map(inv => `
-    <tr>
-      <td><span style="color:var(--text-3);font-size:.8rem;">${fmtDT(inv.createdAt)}</span></td>
-      <td>${inv.clientName}</td>
-      <td>${hideBadge(inv.productType)}</td>
-      <td><span class="qty-pill">${PRODUCTS[inv.productType]?.fmt(inv.quantity) ?? inv.quantity}</span></td>
-      <td class="price-cell">${inv.productType === 'E' ? '–' : (inv.discountAmount ? `<s class="text-muted">${fmt$(inv.originalPrice)}</s> ${fmt$(inv.price)}` : fmt$(inv.price))}</td>
-      <td>${inv.activityName ? `<span class="badge badge-success">-${inv.discountPercentage}%</span><div class="text-muted">${inv.activityName}</div>` : '<span class="text-muted">–</span>'}</td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = myInvoices.map(inv => {
+    const timeDiffMins = (new Date() - new Date(inv.createdAt)) / (1000 * 60);
+    const canDelete = timeDiffMins <= 15;
+    
+    const deleteBtn = canDelete 
+      ? `<button class="btn btn-danger btn-sm btn-icon" onclick="stornoInvoice('${inv.id}')" title="Storna/Annulla fattura" style="margin-left: 5px;"><i class="fa-solid fa-trash"></i></button>`
+      : '';
+      
+    const printBtn = `<button class="btn btn-ghost btn-sm btn-icon" onclick="printReceipt('${inv.id}')" title="Stampa ricevuta cliente"><i class="fa-solid fa-print"></i></button>`;
+
+    return `
+      <tr>
+        <td><span style="color:var(--text-3);font-size:.8rem;">${fmtDT(inv.createdAt)}</span></td>
+        <td>${inv.clientName}</td>
+        <td>${hideBadge(inv.productType)}</td>
+        <td><span class="qty-pill">${formatQty(inv.productType, inv.quantity)}</span></td>
+        <td class="price-cell">${inv.productType === 'E' ? '–' : (inv.discountAmount ? `<s class="text-muted">${fmt$(inv.originalPrice)}</s> ${fmt$(inv.price)}` : fmt$(inv.price))}</td>
+        <td>${inv.activityName ? `<span class="badge badge-success">-${inv.discountPercentage}%</span><div class="text-muted">${inv.activityName}</div>` : '<span class="text-muted">–</span>'}</td>
+        <td>
+          <div style="display:flex;gap:.3rem;justify-content:center;align-items:center;">
+            ${printBtn}
+            ${deleteBtn}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 // ─── Invoice Form ─────────────────────────────────────────────────
@@ -199,7 +202,7 @@ selProduct.addEventListener('change', () => {
   selQty.disabled = false;
   selQty.innerHTML = '<option value="">— Seleziona quantità —</option>' +
     Object.keys(p.prices).map(Number).map(q =>
-      `<option value="${q}">${p.fmt(q)}  →  ${fmt$(p.prices[q])}</option>`
+      `<option value="${q}">${formatQty(type, q)}  →  ${fmt$(p.prices[q])}</option>`
     ).join('');
 });
 
@@ -329,6 +332,240 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   await fetch('/api/auth/logout', { method: 'POST' });
   window.location.href = '/';
 });
+
+// ─── Change Password Modal ────────────────────────────────────────
+const pwModal = document.getElementById('modal-change-password');
+const btnPwTrigger = document.getElementById('btn-change-password-trigger');
+const oldPwInp = document.getElementById('old-password');
+const newPwInp = document.getElementById('new-password-self');
+const pwSaveBtn = document.getElementById('pw-modal-save');
+
+function openPwModal() {
+  oldPwInp.value = '';
+  newPwInp.value = '';
+  pwModal.classList.remove('hidden');
+  oldPwInp.focus();
+}
+
+function closePwModal() {
+  pwModal.classList.add('hidden');
+}
+
+btnPwTrigger.addEventListener('click', openPwModal);
+['pw-modal-close', 'pw-modal-cancel'].forEach(id => {
+  document.getElementById(id).addEventListener('click', closePwModal);
+});
+pwModal.addEventListener('click', e => {
+  if (e.target === e.currentTarget) closePwModal();
+});
+
+pwSaveBtn.addEventListener('click', async () => {
+  const currentPassword = oldPwInp.value;
+  const newPassword = newPwInp.value;
+  if (!currentPassword || !newPassword) {
+    toast('Tutti i campi sono obbligatori', 'error');
+    return;
+  }
+  if (newPassword.length < 4) {
+    toast('La nuova password deve contenere almeno 4 caratteri', 'error');
+    return;
+  }
+  
+  try {
+    const res = await fetch('/api/auth/password', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    
+    toast('Password aggiornata con successo', 'success');
+    closePwModal();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+});
+
+// ─── Payments History ─────────────────────────────────────────────
+async function loadMyPayments() {
+  try {
+    const res = await fetch('/api/payments/my');
+    myPayments = await res.json();
+    renderPayments();
+  } catch {
+    toast('Errore nel caricamento dei pagamenti', 'error');
+  }
+}
+
+function renderPayments() {
+  const tbody = document.getElementById('my-payments-body');
+  if (!tbody) return;
+  if (myPayments.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">
+      <i class="fa-solid fa-receipt"></i><p>Nessun pagamento ancora liquidato</p>
+    </div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = myPayments.map(p => `
+    <tr>
+      <td><span style="color:var(--text-3);font-size:.8rem;">${fmtDT(p.paymentDate)}</span></td>
+      <td class="price-cell text-success" style="font-weight:700;">${fmt$(p.amountPaid)}</td>
+      <td class="price-cell">${fmt$(p.payableAmount)}</td>
+      <td><strong>${p.payableCoupons}</strong></td>
+      <td>${p.commissionPercentage}%</td>
+      <td><span style="color:var(--text-2);font-size:0.78rem;">Da: ${fmtDT(p.periodFrom)}<br>A: ${fmtDT(p.periodTo)}</span></td>
+    </tr>
+  `).join('');
+}
+
+// ─── Storno Invoice (15m window) ──────────────────────────────────
+async function stornoInvoice(id) {
+  if (!window.confirm('Sei sicuro di voler stornare/annullare questa fattura?')) return;
+  try {
+    const res = await fetch(`/api/invoices/my/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    
+    toast('Fattura stornata con successo', 'success');
+    await loadMyInvoices();
+  } catch (err) {
+    toast(err.message || 'Errore durante lo storno', 'error');
+  }
+}
+
+// ─── Print Receipt ────────────────────────────────────────────────
+function printReceipt(id) {
+  const inv = myInvoices.find(i => i.id === id);
+  if (!inv) return;
+
+  const w = window.open('', '_blank', 'width=600,height=600');
+  
+  const originalPriceStr = inv.productType === 'E' ? '–' : fmt$(inv.originalPrice);
+  const discountStr = inv.discountPercentage ? `${inv.discountPercentage}% (-${fmt$(inv.discountAmount)})` : 'Nessuno';
+  const priceStr = inv.productType === 'E' ? '–' : fmt$(inv.price);
+
+  w.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Ricevuta - Blue Marine NOW</title>
+      <meta charset="utf-8" />
+      <style>
+        body {
+          font-family: 'Courier New', Courier, monospace;
+          color: #000;
+          background: #fff;
+          padding: 20px;
+          max-width: 300px;
+          margin: 0 auto;
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 20px;
+        }
+        .logo {
+          font-size: 24px;
+          margin: 0;
+        }
+        .subtitle {
+          font-size: 12px;
+          margin: 5px 0 0 0;
+          color: #555;
+        }
+        .divider {
+          border-top: 1px dashed #000;
+          margin: 10px 0;
+        }
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+          margin: 4px 0;
+        }
+        .total-row {
+          display: flex;
+          justify-content: space-between;
+          font-weight: bold;
+          font-size: 16px;
+          margin: 10px 0;
+        }
+        .footer-text {
+          text-align: center;
+          font-size: 11px;
+          margin-top: 30px;
+        }
+        @media print {
+          body { padding: 0; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h2 class="logo">⚓ Blue Marine NOW</h2>
+        <p class="subtitle">Gestione Fatture di Servizio</p>
+      </div>
+      <div class="divider"></div>
+      <div class="info-row">
+        <span>Fattura ID:</span>
+        <span style="font-size:10px;">${inv.id.slice(0,8)}...</span>
+      </div>
+      <div class="info-row">
+        <span>Data:</span>
+        <span>${new Date(inv.createdAt).toLocaleString('it-IT')}</span>
+      </div>
+      <div class="info-row">
+        <span>Operatore:</span>
+        <span>${inv.employeeName}</span>
+      </div>
+      <div class="info-row">
+        <span>Cliente:</span>
+        <span>${inv.clientName}</span>
+      </div>
+      <div class="divider"></div>
+      <div class="info-row">
+        <span>Prodotto:</span>
+        <span><strong>${inv.productName}</strong></span>
+      </div>
+      <div class="info-row">
+        <span>Quantità:</span>
+        <span>${formatQty(inv.productType, inv.quantity)}</span>
+      </div>
+      <div class="divider"></div>
+      <div class="info-row">
+        <span>Prezzo originale:</span>
+        <span>${originalPriceStr}</span>
+      </div>
+      <div class="info-row">
+        <span>Convenzione:</span>
+        <span style="max-width:180px;text-align:right;">${inv.activityName || 'Nessuna'}</span>
+      </div>
+      <div class="info-row">
+        <span>Sconto:</span>
+        <span>${discountStr}</span>
+      </div>
+      <div class="divider"></div>
+      <div class="total-row">
+        <span>TOTALE PAGATO:</span>
+        <span>${priceStr}</span>
+      </div>
+      <div class="divider"></div>
+      <div class="footer-text">
+        Grazie per averci scelto!<br>Blue Marine NOW Portale Servizi
+      </div>
+      <script>
+        window.onload = function() {
+          window.print();
+        }
+      </script>
+    </body>
+    </html>
+  `);
+  w.document.close();
+}
+
+window.stornoInvoice = stornoInvoice;
+window.printReceipt = printReceipt;
 
 // ─── Start ────────────────────────────────────────────────────────
 init();

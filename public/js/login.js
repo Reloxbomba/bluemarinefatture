@@ -27,6 +27,14 @@ const btnText     = document.getElementById('btn-text');
 const btnLoading  = document.getElementById('btn-loading');
 const errorBox    = document.getElementById('login-error');
 const errorMsg    = document.getElementById('login-error-msg');
+const rememberMeCh = document.getElementById('remember-me');
+
+// Pre-fill username if stored
+const rememberedUsername = localStorage.getItem('rememberedUsername');
+if (rememberedUsername) {
+  document.getElementById('username').value = rememberedUsername;
+  rememberMeCh.checked = true;
+}
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -47,6 +55,13 @@ form.addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Credenziali non valide');
+
+    // Save or remove username from localStorage
+    if (rememberMeCh.checked) {
+      localStorage.setItem('rememberedUsername', username);
+    } else {
+      localStorage.removeItem('rememberedUsername');
+    }
 
     window.location.href = data.role === 'admin' ? '/admin.html' : '/employee.html';
   } catch (err) {

@@ -16,6 +16,30 @@
     <p class="text-muted" style="font-size:0.85rem;">Caricamento...</p>
   </div>
 
+  <!-- ══ MODAL: Cambia Password ═════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-change-password">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-key text-accent"></i>&nbsp; Cambia Password</h3>
+        <button class="btn btn-ghost btn-icon" id="pw-modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label class="form-label" for="old-password">Password Attuale</label>
+          <input type="password" id="old-password" class="form-control" placeholder="Inserisci la password attuale" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-password-self">Nuova Password</label>
+          <input type="password" id="new-password-self" class="form-control" placeholder="Nuova password (min. 4 caratteri)" required />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="pw-modal-cancel">Annulla</button>
+        <button class="btn btn-primary" id="pw-modal-save"><i class="fa-solid fa-check"></i> Aggiorna Password</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast-container"></div>
 
@@ -33,6 +57,9 @@
           <div class="badge badge-employee user-chip-role">Dipendente</div>
         </div>
       </div>
+      <button class="btn btn-ghost btn-sm" id="btn-change-password-trigger" title="Cambia la tua password">
+        <i class="fa-solid fa-key"></i> Password
+      </button>
       <button class="btn btn-ghost btn-sm" id="logout-btn">
         <i class="fa-solid fa-right-from-bracket"></i> Esci
       </button>
@@ -169,15 +196,48 @@
                 <th>Cliente</th>
                 <th>Prodotto</th>
                 <th>Qtà</th>
-                <th>Prezzo</th><th>Convenzione</th>
+                <th>Prezzo</th>
+                <th>Convenzione</th>
+                <th style="width: 100px; text-align: center;">Azioni</th>
               </tr>
             </thead>
             <tbody id="my-invoices-body">
               <tr>
-                <td colspan="6">
+                <td colspan="7">
                   <div class="empty-state">
                     <i class="fa-solid fa-inbox"></i>
                     <p>Nessuna fattura ancora registrata</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── My Payments ─────────────────────────────────────── -->
+      <div class="card fade-in" style="animation-delay:.42s">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-receipt text-success"></i>&nbsp; Storico Pagamenti Ricevuti</h3>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Data Liquidazione</th>
+                <th>Importo Ricevuto</th>
+                <th>Fatturato Liquidato</th>
+                <th>Coupon Pagate</th>
+                <th>% Commissione</th>
+                <th>Periodo Riferimento</th>
+              </tr>
+            </thead>
+            <tbody id="my-payments-body">
+              <tr>
+                <td colspan="6">
+                  <div class="empty-state">
+                    <i class="fa-solid fa-receipt"></i>
+                    <p>Nessun pagamento ancora liquidato</p>
                   </div>
                 </td>
               </tr>

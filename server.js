@@ -5,7 +5,7 @@ const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { USERS_FILE, INVOICES_FILE, ACTIVITIES_FILE, initStorage, readJSON, writeJSON } = require('./storage');
+const { USERS_FILE, INVOICES_FILE, ACTIVITIES_FILE, PRODUCTS_FILE, PAYMENTS_FILE, initStorage, readJSON, writeJSON } = require('./storage');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,15 +33,6 @@ const requireAdmin = (req, res, next) => {
   if (!req.session?.user || req.session.user.role !== 'admin')
     return res.status(403).json({ error: 'Accesso negato – solo admin' });
   next();
-};
-
-// ─── Product Catalog ──────────────────────────────────────────────
-const PRODUCTS = {
-  A: { id: 'A', name: 'Combo cibo', format: 'NxN',    prices: {1:600,2:1200,3:1800,4:2400,5:3000,6:3600,7:4200,8:4800,9:5400,10:6000,15:9000,20:12000} },
-  B: { id: 'B', name: 'Antistress singolo', format: 'N',      prices: {1:350,2:700,3:1050,4:1400,5:1750,6:2100,7:2450,8:2800,9:3150,10:3500,15:5250,20:7000} },
-  C: { id: 'C', name: 'Combo cibo antistress', format: 'NxNxN',  prices: {1:950,2:1900,3:2850,4:3800,5:4750,6:5700,7:6650,8:7600,9:8550,10:9500,15:14250,20:19000} },
-  D: { id: 'D', name: 'Personalizzata', format: 'custom', prices: null }, // quantità e prezzo liberi
-  E: { id: 'E', name: 'Coupon', format: 'custom_qty', prices: null } // quantità manuale, prezzo invisibile per il dipendente (ogni coupon vale 200 nel calcolo admin)
 };
 
 // Helper per ottenere la data YYYY-MM-DD nel fuso orario italiano
@@ -85,7 +76,10 @@ app.get('/api/auth/me', (req, res) => {
 // ══════════════════════════════════════════════════════════════════
 // PRODUCTS
 // ══════════════════════════════════════════════════════════════════
-app.get('/api/products', requireAuth, (req, res) => res.json(PRODUCTS));
+app.get('/api/products', requireAuth, async (req, res) => {
+  const products = await readJSON(PRODUCTS_FILE);
+  res.json(products);
+});
 
 app.get('/api/activities', requireAuth, async (req, res) => {
   const activities = await readJSON(ACTIVITIES_FILE);
@@ -99,7 +93,8 @@ app.get('/api/activities', requireAuth, async (req, res) => {
 // Employee: create invoice
 app.post('/api/invoices', requireAuth, async (req, res) => {
   const { clientName, productType, quantity, notes, manualPrice, activityId } = req.body;
-  const product = PRODUCTS[productType];
+  const products = await readJSON(PRODUCTS_FILE);
+  const product = products[productType];
   const qty = productType === 'D'
     ? String(quantity ?? '').trim()
     : parseInt(quantity, 10);
@@ -240,7 +235,8 @@ app.get('/api/stats', requireAdmin, async (req, res) => {
     };
   });
 
-  const productStats = Object.values(PRODUCTS).map(p => ({
+  const products = await readJSON(PRODUCTS_FILE);
+  const productStats = Object.values(products).map(p => ({
     type:   p.id,
     name:   p.name,
     count:  invoices.filter(i => i.productType === p.id).length,
@@ -385,9 +381,47 @@ app.put('/api/users/:id/salary-reset', requireAdmin, async (req, res) => {
   const user = users.find(u => u.id === req.params.id && u.role === 'employee');
   if (!user) return res.status(404).json({ error: 'Dipendente non trovato' });
 
+  // Calcolo statistiche per lo storico pagamenti
+  const invoices = await readJSON(INVOICES_FILE);
+  const empAll = invoices.filter(i => i.employeeId === user.id);
+  const salaryResetAt = user.salaryResetAt || null;
+  const payableInvoices = salaryResetAt
+    ? empAll.filter(i => i.createdAt > salaryResetAt)
+    : empAll;
+  
+  const commissionPercentage = Number.isFinite(Number(user.commissionPercentage))
+    ? Number(user.commissionPercentage)
+    : 0;
+
+  const payableCoupons = payableInvoices
+    .filter(i => i.productType === 'E')
+    .reduce((s, i) => s + (parseInt(i.quantity, 10) || 0), 0);
+
+  const couponPay = payableCoupons * 200;
+  const commissionPay = Math.round(payableInvoices.reduce((s, i) => s + i.price, 0) * commissionPercentage) / 100;
+  const amountDue = commissionPay + couponPay;
+  const payableAmount = payableInvoices.reduce((s, i) => s + i.price, 0);
+
+  // Registrazione pagamento in payments.json
+  const payments = await readJSON(PAYMENTS_FILE);
+  const newPayment = {
+    id: uuidv4(),
+    employeeId: user.id,
+    employeeName: user.username,
+    amountPaid: amountDue,
+    payableAmount,
+    payableCoupons,
+    commissionPercentage,
+    paymentDate: new Date().toISOString(),
+    periodFrom: salaryResetAt || user.createdAt,
+    periodTo: new Date().toISOString()
+  };
+  payments.push(newPayment);
+  await writeJSON(PAYMENTS_FILE, payments);
+
   user.salaryResetAt = new Date().toISOString();
   await writeJSON(USERS_FILE, users);
-  res.json({ success: true, salaryResetAt: user.salaryResetAt });
+  res.json({ success: true, salaryResetAt: user.salaryResetAt, payment: newPayment });
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -395,11 +429,12 @@ app.put('/api/users/:id/salary-reset', requireAdmin, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════
 app.get('/api/export/csv', requireAdmin, async (req, res) => {
   const invoices = await readJSON(INVOICES_FILE);
+  const products = await readJSON(PRODUCTS_FILE);
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
   const header = ['ID','Dipendente','Cliente','Prodotto','Quantità','Prezzo originale ($)','Sconto (%)','Risparmio ($)','Prezzo pagato ($)','Attività','Note','Data e Ora'];
   const rows   = invoices.map(i => [
-    esc(i.id), esc(i.employeeName), esc(i.clientName), esc(PRODUCTS[i.productType]?.name || i.productName),
+    esc(i.id), esc(i.employeeName), esc(i.clientName), esc(products[i.productType]?.name || i.productName),
     esc(i.quantity), esc(i.originalPrice ?? i.price), esc(i.discountPercentage ?? 0), esc(i.discountAmount ?? 0),
     esc(i.price), esc(i.activityName), esc(i.notes),
     esc(new Date(i.createdAt).toLocaleString('it-IT'))
@@ -409,6 +444,110 @@ app.get('/api/export/csv', requireAdmin, async (req, res) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="fatture_${new Date().toISOString().slice(0,10)}.csv"`);
   res.send('\uFEFF' + csv); // BOM for Excel
+});
+
+// ══════════════════════════════════════════════════════════════════
+// ADMIN: PRODUCTS CRUD
+// ══════════════════════════════════════════════════════════════════
+app.get('/api/admin/products', requireAdmin, async (req, res) => {
+  res.json(await readJSON(PRODUCTS_FILE));
+});
+
+app.post('/api/admin/products', requireAdmin, async (req, res) => {
+  const { id, name, format, prices } = req.body;
+  if (!id || !name || !format) return res.status(400).json({ error: 'Campi obbligatori mancanti' });
+
+  const products = await readJSON(PRODUCTS_FILE);
+  if (products[id]) return res.status(400).json({ error: 'ID prodotto già esistente' });
+
+  products[id] = { id, name, format, prices: prices || null };
+  await writeJSON(PRODUCTS_FILE, products);
+  res.status(201).json({ success: true, product: products[id] });
+});
+
+app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
+  const { name, format, prices } = req.body;
+  if (!name || !format) return res.status(400).json({ error: 'Campi obbligatori mancanti' });
+
+  const products = await readJSON(PRODUCTS_FILE);
+  const product = products[req.params.id];
+  if (!product) return res.status(404).json({ error: 'Prodotto non trovato' });
+
+  product.name = name;
+  product.format = format;
+  product.prices = prices || null;
+
+  await writeJSON(PRODUCTS_FILE, products);
+  res.json({ success: true, product });
+});
+
+app.delete('/api/admin/products/:id', requireAdmin, async (req, res) => {
+  const products = await readJSON(PRODUCTS_FILE);
+  if (!products[req.params.id]) return res.status(404).json({ error: 'Prodotto non trovato' });
+
+  delete products[req.params.id];
+  await writeJSON(PRODUCTS_FILE, products);
+  res.json({ success: true });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// AUTH PASSWORD CHANGE
+// ══════════════════════════════════════════════════════════════════
+app.put('/api/auth/password', requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!newPassword || newPassword.length < 4) {
+    return res.status(400).json({ error: 'La nuova password deve contenere almeno 4 caratteri' });
+  }
+
+  const users = await readJSON(USERS_FILE);
+  const user = users.find(u => u.id === req.session.user.id);
+  if (!user) return res.status(404).json({ error: 'Utente non trovato' });
+
+  if (currentPassword) {
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) return res.status(400).json({ error: 'Password attuale errata' });
+  }
+
+  user.password = await bcrypt.hash(newPassword, 10);
+  await writeJSON(USERS_FILE, users);
+  res.json({ success: true });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// INVOICE DELETION (STORNO 15 MINUTI)
+// ══════════════════════════════════════════════════════════════════
+app.delete('/api/invoices/my/:id', requireAuth, async (req, res) => {
+  let invoices = await readJSON(INVOICES_FILE);
+  const invoice = invoices.find(i => i.id === req.params.id);
+  if (!invoice) return res.status(404).json({ error: 'Fattura non trovata' });
+  
+  if (invoice.employeeId !== req.session.user.id) {
+    return res.status(403).json({ error: 'Accesso negato: puoi eliminare solo le tue fatture' });
+  }
+
+  const timeDiffMs = new Date() - new Date(invoice.createdAt);
+  const timeDiffMins = timeDiffMs / (1000 * 60);
+  if (timeDiffMins > 15) {
+    return res.status(400).json({ error: 'Tempo scaduto: puoi stornare una fattura solo entro 15 minuti' });
+  }
+
+  invoices = invoices.filter(i => i.id !== req.params.id);
+  await writeJSON(INVOICES_FILE, invoices);
+  res.json({ success: true });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// PAYMENTS
+// ══════════════════════════════════════════════════════════════════
+app.get('/api/payments', requireAdmin, async (req, res) => {
+  const payments = await readJSON(PAYMENTS_FILE);
+  res.json([...payments].reverse());
+});
+
+app.get('/api/payments/my', requireAuth, async (req, res) => {
+  const payments = await readJSON(PAYMENTS_FILE);
+  const my = payments.filter(p => p.employeeId === req.session.user.id);
+  res.json([...my].reverse());
 });
 
 // ──────────────────────────────────────────────────────────────────
