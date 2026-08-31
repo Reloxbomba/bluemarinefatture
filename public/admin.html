@@ -262,8 +262,15 @@
           <div class="card-body"><canvas id="chart-employees" height="210"></canvas></div>
         </div>
         <div class="card fade-in" style="animation-delay:.3s">
-          <div class="card-header"><h3>Distribuzione Prodotti</h3></div>
-          <div class="card-body"><canvas id="chart-products" height="210"></canvas></div>
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+            <h3>Andamento Incassi</h3>
+            <div class="chart-filters" style="display:flex; gap:0.4rem;">
+              <button class="btn btn-primary btn-sm" onclick="setChartFilter('weekly')" id="btn-chart-weekly">Settimanale</button>
+              <button class="btn btn-outline btn-sm" onclick="setChartFilter('monthly')" id="btn-chart-monthly">Mensile</button>
+              <button class="btn btn-outline btn-sm" onclick="setChartFilter('yearly')" id="btn-chart-yearly">Annuale</button>
+            </div>
+          </div>
+          <div class="card-body"><canvas id="chart-revenue" height="210"></canvas></div>
         </div>
       </div>
 

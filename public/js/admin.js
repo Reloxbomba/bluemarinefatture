@@ -66,7 +66,7 @@ let resetTargetId   = null;
 let deleteTarget    = null; // { id, name, type: 'user'|'invoice'|'product' }
 let salaryTarget    = null;
 let empChart     = null;
-let prodChart    = null;
+let revenueChart = null;
 let activityTargetId = null;
 let productTargetId = null;
 
@@ -217,6 +217,128 @@ function renderOverview() {
   renderCharts();
 }
 
+
+// ─── Chart Filters Logic ──────────────────────────────────────────
+let currentChartFilter = 'weekly';
+
+function getRevenueChartData(filter) {
+  const sortedInvoices = [...allInvoices].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  if (filter === 'weekly') {
+    // Current Week (Lunedì - Domenica) day-by-day (7 points)
+    const days = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+    const sortedDays = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+    const weeklyTotals = { 'Lun': 0, 'Mar': 0, 'Mer': 0, 'Gio': 0, 'Ven': 0, 'Sab': 0, 'Dom': 0 };
+
+    function isInCurrentWeek(dateInput) {
+      const now = new Date();
+      const d = new Date(dateInput);
+      const nowDay = now.getDay();
+      const diffToMon = now.getDate() - nowDay + (nowDay === 0 ? -6 : 1);
+      const monday = new Date(now.setDate(diffToMon));
+      monday.setHours(0,0,0,0);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23,59,59,999);
+      return d >= monday && d <= sunday;
+    }
+
+    sortedInvoices.forEach(inv => {
+      const invDate = new Date(inv.createdAt);
+      if (isInCurrentWeek(invDate)) {
+        const dayIndex = invDate.getDay();
+        const dayLabel = days[dayIndex];
+        weeklyTotals[dayLabel] += inv.price;
+      }
+    });
+
+    const labels = sortedDays;
+    const data = sortedDays.map(day => weeklyTotals[day]);
+    return { labels, data, label: 'Incasso Giornaliero' };
+
+  } else if (filter === 'monthly') {
+    // Current Month grouped by weeks (Week 1 - Week 5)
+    const weeklyLabels = ['Sett. 1', 'Sett. 2', 'Sett. 3', 'Sett. 4', 'Sett. 5'];
+    const monthlyWeeks = { 'Sett. 1': 0, 'Sett. 2': 0, 'Sett. 3': 0, 'Sett. 4': 0, 'Sett. 5': 0 };
+
+    function isInCurrentMonth(dateInput) {
+      const now = new Date();
+      const d = new Date(dateInput);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+
+    function getWeekOfMonth(date) {
+      const day = date.getDate();
+      if (day <= 7) return 'Sett. 1';
+      if (day <= 14) return 'Sett. 2';
+      if (day <= 21) return 'Sett. 3';
+      if (day <= 28) return 'Sett. 4';
+      return 'Sett. 5';
+    }
+
+    sortedInvoices.forEach(inv => {
+      const invDate = new Date(inv.createdAt);
+      if (isInCurrentMonth(invDate)) {
+        const weekLabel = getWeekOfMonth(invDate);
+        monthlyWeeks[weekLabel] += inv.price;
+      }
+    });
+
+    const labels = weeklyLabels;
+    const data = weeklyLabels.map(w => monthlyWeeks[w]);
+    return { labels, data, label: 'Incasso Settimanale' };
+
+  } else if (filter === 'yearly') {
+    // Current Year grouped by months (Gennaio - Dicembre)
+    const monthLabels = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+    const annualTotals = {};
+    monthLabels.forEach(m => annualTotals[m] = 0);
+
+    function isInCurrentYear(dateInput) {
+      const now = new Date();
+      const d = new Date(dateInput);
+      return d.getFullYear() === now.getFullYear();
+    }
+
+    sortedInvoices.forEach(inv => {
+      const invDate = new Date(inv.createdAt);
+      if (isInCurrentYear(invDate)) {
+        const monthIndex = invDate.getMonth();
+        const monthLabel = monthLabels[monthIndex];
+        annualTotals[monthLabel] += inv.price;
+      }
+    });
+
+    const labels = monthLabels;
+    const data = monthLabels.map(m => annualTotals[m]);
+    return { labels, data, label: 'Incasso Mensile' };
+  }
+}
+
+function setChartFilter(filter) {
+  currentChartFilter = filter;
+  
+  // Update active button state in UI
+  ['weekly', 'monthly', 'yearly'].forEach(f => {
+    const btn = document.getElementById(`btn-chart-${f}`);
+    if (btn) {
+      if (f === filter) {
+        btn.classList.add('active');
+        btn.classList.remove('btn-outline');
+        btn.classList.add('btn-primary');
+      } else {
+        btn.classList.remove('active');
+        btn.classList.add('btn-outline');
+        btn.classList.remove('btn-primary');
+      }
+    }
+  });
+
+  renderCharts();
+}
+
+window.setChartFilter = setChartFilter;
+
 function renderCharts() {
   // Chart.js defaults
   Chart.defaults.color = '#5d8099';
@@ -263,28 +385,45 @@ function renderCharts() {
     });
   }
 
-  // Product doughnut chart
-  const prodCtx = document.getElementById('chart-products')?.getContext('2d');
-  if (prodCtx) {
-    if (prodChart) prodChart.destroy();
-    prodChart = new Chart(prodCtx, {
-      type: 'doughnut',
+  // Revenue trend line/area chart
+  const revCtx = document.getElementById('chart-revenue')?.getContext('2d');
+  if (revCtx) {
+    if (revenueChart) revenueChart.destroy();
+
+    const chartData = getRevenueChartData(currentChartFilter);
+
+    revenueChart = new Chart(revCtx, {
+      type: 'line',
       data: {
-        labels: stats.products.map(p => p.name),
+        labels: chartData.labels,
         datasets: [{
-          data: stats.products.map(p => p.count),
-          backgroundColor: ['rgba(0,180,216,0.65)', 'rgba(46,213,115,0.65)', 'rgba(255,165,2,0.65)'],
-          borderColor:     ['#00b4d8', '#2ed573', '#ffa502'],
-          borderWidth: 2,
-          hoverOffset: 6
+          label: chartData.label,
+          data: chartData.data,
+          borderColor: '#2ed573',
+          backgroundColor: 'rgba(46,213,115,0.12)',
+          borderWidth: 2.5,
+          tension: 0.38,
+          fill: true,
+          pointBackgroundColor: '#2ed573',
+          pointHoverRadius: 6
         }]
       },
       options: {
         responsive: true,
-        cutout: '62%',
         plugins: {
-          legend: { position:'bottom', labels: { color:'#a8c4dc', padding:16, boxWidth:14, font:{size:12} } },
-          tooltip: { ...tooltipStyle, callbacks: { label: c => ` ${c.label}: ${c.raw} fatture` } }
+          legend: { display: false },
+          tooltip: { ...tooltipStyle, callbacks: { label: c => ` ${chartData.label}: ${fmt$(c.raw)}` } }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#5d8099' } },
+          y: { 
+            grid: { color: 'rgba(255,255,255,0.04)' }, 
+            ticks: { 
+              color: '#5d8099',
+              callback: v => fmt$(v)
+            }, 
+            beginAtZero: true 
+          }
         }
       }
     });
