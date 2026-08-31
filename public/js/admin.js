@@ -220,103 +220,145 @@ function renderOverview() {
 
 // ─── Chart Filters Logic ──────────────────────────────────────────
 let currentChartFilter = 'weekly';
+let currentChartDate   = new Date();
+
+// ─── Chart Helpers ────────────────────────────────────────────────
+// Returns the Monday (00:00) of the week containing `date`, without mutating it.
+const getMondayOf = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 
 function getRevenueChartData(filter) {
   const sortedInvoices = [...allInvoices].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   if (filter === 'weekly') {
-    // Current Week (Lunedì - Domenica) day-by-day (7 points)
-    const days = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+    const dayNames  = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
     const sortedDays = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
-    const weeklyTotals = { 'Lun': 0, 'Mar': 0, 'Mer': 0, 'Gio': 0, 'Ven': 0, 'Sab': 0, 'Dom': 0 };
+    const totals    = { Lun: 0, Mar: 0, Mer: 0, Gio: 0, Ven: 0, Sab: 0, Dom: 0 };
 
-    function isInCurrentWeek(dateInput) {
-      const now = new Date();
-      const d = new Date(dateInput);
-      const nowDay = now.getDay();
-      const diffToMon = now.getDate() - nowDay + (nowDay === 0 ? -6 : 1);
-      const monday = new Date(now.setDate(diffToMon));
-      monday.setHours(0,0,0,0);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23,59,59,999);
-      return d >= monday && d <= sunday;
-    }
+    const monday = getMondayOf(currentChartDate);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
 
     sortedInvoices.forEach(inv => {
-      const invDate = new Date(inv.createdAt);
-      if (isInCurrentWeek(invDate)) {
-        const dayIndex = invDate.getDay();
-        const dayLabel = days[dayIndex];
-        weeklyTotals[dayLabel] += inv.price;
+      const d = new Date(inv.createdAt);
+      if (d >= monday && d <= sunday) {
+        totals[dayNames[d.getDay()]] += inv.price;
       }
     });
 
-    const labels = sortedDays;
-    const data = sortedDays.map(day => weeklyTotals[day]);
-    return { labels, data, label: 'Incasso Giornaliero' };
+    return { labels: sortedDays, data: sortedDays.map(day => totals[day]), label: 'Incasso Giornaliero' };
 
   } else if (filter === 'monthly') {
-    // Current Month grouped by weeks (Week 1 - Week 5)
-    const weeklyLabels = ['Sett. 1', 'Sett. 2', 'Sett. 3', 'Sett. 4', 'Sett. 5'];
-    const monthlyWeeks = { 'Sett. 1': 0, 'Sett. 2': 0, 'Sett. 3': 0, 'Sett. 4': 0, 'Sett. 5': 0 };
+    const weekLabels = ['Sett. 1', 'Sett. 2', 'Sett. 3', 'Sett. 4', 'Sett. 5'];
+    const totals     = { 'Sett. 1': 0, 'Sett. 2': 0, 'Sett. 3': 0, 'Sett. 4': 0, 'Sett. 5': 0 };
+    const targetMonth = currentChartDate.getMonth();
+    const targetYear  = currentChartDate.getFullYear();
 
-    function isInCurrentMonth(dateInput) {
-      const now = new Date();
-      const d = new Date(dateInput);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    }
-
-    function getWeekOfMonth(date) {
-      const day = date.getDate();
-      if (day <= 7) return 'Sett. 1';
+    const getWeekSlot = (day) => {
+      if (day <= 7)  return 'Sett. 1';
       if (day <= 14) return 'Sett. 2';
       if (day <= 21) return 'Sett. 3';
       if (day <= 28) return 'Sett. 4';
       return 'Sett. 5';
-    }
+    };
 
     sortedInvoices.forEach(inv => {
-      const invDate = new Date(inv.createdAt);
-      if (isInCurrentMonth(invDate)) {
-        const weekLabel = getWeekOfMonth(invDate);
-        monthlyWeeks[weekLabel] += inv.price;
+      const d = new Date(inv.createdAt);
+      if (d.getMonth() === targetMonth && d.getFullYear() === targetYear) {
+        totals[getWeekSlot(d.getDate())] += inv.price;
       }
     });
 
-    const labels = weeklyLabels;
-    const data = weeklyLabels.map(w => monthlyWeeks[w]);
-    return { labels, data, label: 'Incasso Settimanale' };
+    return { labels: weekLabels, data: weekLabels.map(w => totals[w]), label: 'Incasso Settimanale' };
 
   } else if (filter === 'yearly') {
-    // Current Year grouped by months (Gennaio - Dicembre)
     const monthLabels = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
-    const annualTotals = {};
-    monthLabels.forEach(m => annualTotals[m] = 0);
-
-    function isInCurrentYear(dateInput) {
-      const now = new Date();
-      const d = new Date(dateInput);
-      return d.getFullYear() === now.getFullYear();
-    }
+    const totals      = {};
+    monthLabels.forEach(m => { totals[m] = 0; });
+    const targetYear  = currentChartDate.getFullYear();
 
     sortedInvoices.forEach(inv => {
-      const invDate = new Date(inv.createdAt);
-      if (isInCurrentYear(invDate)) {
-        const monthIndex = invDate.getMonth();
-        const monthLabel = monthLabels[monthIndex];
-        annualTotals[monthLabel] += inv.price;
+      const d = new Date(inv.createdAt);
+      if (d.getFullYear() === targetYear) {
+        totals[monthLabels[d.getMonth()]] += inv.price;
       }
     });
 
-    const labels = monthLabels;
-    const data = monthLabels.map(m => annualTotals[m]);
-    return { labels, data, label: 'Incasso Mensile' };
+    return { labels: monthLabels, data: monthLabels.map(m => totals[m]), label: 'Incasso Mensile' };
   }
+
+  return { labels: [], data: [], label: '' };
+}
+
+function shiftChartPeriod(direction) {
+  const d   = new Date(currentChartDate);
+  const now = new Date();
+
+  if (currentChartFilter === 'weekly') {
+    d.setDate(d.getDate() + (direction * 7));
+    const monday    = getMondayOf(d);
+    const nowMonday = getMondayOf(now);
+    if (monday > nowMonday) return; // block future weeks
+  } else if (currentChartFilter === 'monthly') {
+    d.setMonth(d.getMonth() + direction);
+    const firstOfNew = new Date(d.getFullYear(), d.getMonth(), 1);
+    const firstOfNow = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (firstOfNew > firstOfNow) return; // block future months
+  } else if (currentChartFilter === 'yearly') {
+    d.setFullYear(d.getFullYear() + direction);
+    if (d.getFullYear() > now.getFullYear()) return; // block future years
+  }
+
+  currentChartDate = d;
+  renderCharts();
+}
+
+function updatePeriodControls() {
+  const labelEl = document.getElementById('chart-period-label');
+  const nextBtn  = document.getElementById('btn-chart-next');
+  if (!labelEl) return;
+
+  const now = new Date();
+  let isCurrent = false;
+
+  if (currentChartFilter === 'weekly') {
+    const monday    = getMondayOf(currentChartDate);
+    const nowMonday = getMondayOf(now);
+    const sunday    = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    isCurrent = monday.getTime() === nowMonday.getTime();
+    labelEl.textContent = isCurrent
+      ? 'Sett. Corrente'
+      : monday.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) +
+        ' - ' + sunday.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+
+  } else if (currentChartFilter === 'monthly') {
+    isCurrent = currentChartDate.getMonth() === now.getMonth() &&
+                currentChartDate.getFullYear() === now.getFullYear();
+    labelEl.textContent = isCurrent
+      ? 'Mese Corrente'
+      : currentChartDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+
+  } else if (currentChartFilter === 'yearly') {
+    isCurrent = currentChartDate.getFullYear() === now.getFullYear();
+    labelEl.textContent = isCurrent
+      ? 'Anno Corrente'
+      : currentChartDate.getFullYear().toString();
+  }
+
+  if (nextBtn) nextBtn.disabled = isCurrent;
 }
 
 function setChartFilter(filter) {
   currentChartFilter = filter;
+  currentChartDate = new Date(); // Reset date on filter change
   
   // Update active button state in UI
   ['weekly', 'monthly', 'yearly'].forEach(f => {
@@ -338,8 +380,10 @@ function setChartFilter(filter) {
 }
 
 window.setChartFilter = setChartFilter;
+window.shiftChartPeriod = shiftChartPeriod;
 
 function renderCharts() {
+  updatePeriodControls();
   // Chart.js defaults
   Chart.defaults.color = '#5d8099';
   Chart.defaults.font.family = 'Outfit';
@@ -354,7 +398,7 @@ function renderCharts() {
 
   // Employee bar chart
   const empCtx = document.getElementById('chart-employees')?.getContext('2d');
-  if (empCtx) {
+  if (empCtx && stats) {
     if (empChart) empChart.destroy();
     const data = stats.employees.filter(e => e.totalInvoices > 0);
     empChart = new Chart(empCtx, {
@@ -568,7 +612,7 @@ function renderEmployeeStats() {
   const sorted = [...stats.employees].sort((a,b) => b.totalInvoices - a.totalInvoices);
 
   if (!sorted.length) {
-    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><i class="fa-solid fa-users"></i><p>Nessun dipendente registrato</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><i class="fa-solid fa-users"></i><p>Nessun dipendente registrato</p></div></td></tr>`;
     return;
   }
 
@@ -583,6 +627,7 @@ function renderEmployeeStats() {
       </td>
       <td><strong>${emp.totalInvoices}</strong></td>
       <td class="price-cell">${fmt$(emp.totalAmount)}</td>
+      <td class="price-cell text-accent" style="font-weight:700;">${fmt$(emp.payableAmount)}</td>
       <td>
         <label style="display:flex;align-items:center;gap:.35rem;max-width:110px;">
           <input class="form-control commission-input" type="number" min="0" max="100" step="0.01"

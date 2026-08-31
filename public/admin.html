@@ -264,6 +264,13 @@
         <div class="card fade-in" style="animation-delay:.3s">
           <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
             <h3>Andamento Incassi</h3>
+            
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+              <button class="btn btn-outline btn-sm btn-icon" onclick="shiftChartPeriod(-1)" title="Periodo precedente"><i class="fa-solid fa-chevron-left"></i></button>
+              <span id="chart-period-label" style="font-size:0.9rem; font-weight:700; color:var(--text-1); min-width:130px; text-align:center;"></span>
+              <button class="btn btn-outline btn-sm btn-icon" onclick="shiftChartPeriod(1)" id="btn-chart-next" title="Periodo successivo"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+
             <div class="chart-filters" style="display:flex; gap:0.4rem;">
               <button class="btn btn-primary btn-sm" onclick="setChartFilter('weekly')" id="btn-chart-weekly">Settimanale</button>
               <button class="btn btn-outline btn-sm" onclick="setChartFilter('monthly')" id="btn-chart-monthly">Mensile</button>
@@ -359,6 +366,7 @@
                 <th>Dipendente</th>
                 <th>Fatture Tot.</th>
                 <th>Incassato Tot.</th>
+                <th>Incasso Sett.</th>
                 <th>% Guadagno</th>
                 <th>Coupon</th>
                 <th>Da Pagare</th>
@@ -369,7 +377,7 @@
               </tr>
             </thead>
             <tbody id="emp-body">
-              <tr><td colspan="10" class="text-center text-muted" style="padding:1.5rem">Caricamento...</td></tr>
+              <tr><td colspan="11" class="text-center text-muted" style="padding:1.5rem">Caricamento...</td></tr>
             </tbody>
           </table>
         </div>
