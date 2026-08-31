@@ -29,19 +29,7 @@ const errorBox    = document.getElementById('login-error');
 const errorMsg    = document.getElementById('login-error-msg');
 const rememberMeCh = document.getElementById('remember-me');
 
-// Pre-fill username if stored
-const rememberedUsername = localStorage.getItem('rememberedUsername');
-if (rememberedUsername) {
-  document.getElementById('username').value = rememberedUsername;
-  rememberMeCh.checked = true;
-}
-
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const username = document.getElementById('username').value.trim();
-  const password = pwInput.value;
-
+async function doLogin(username, password) {
   errorBox.classList.add('hidden');
   btnText.classList.add('hidden');
   btnLoading.classList.remove('hidden');
@@ -56,12 +44,15 @@ form.addEventListener('submit', async (e) => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Credenziali non valide');
 
-    // Save or remove username from localStorage
+    // Save or remove credentials from localStorage
     if (rememberMeCh.checked) {
       localStorage.setItem('rememberedUsername', username);
+      localStorage.setItem('rememberedPassword', password);
     } else {
       localStorage.removeItem('rememberedUsername');
+      localStorage.removeItem('rememberedPassword');
     }
+    sessionStorage.removeItem('preventAutoLogin');
 
     window.location.href = data.role === 'admin' ? '/admin.html' : '/employee.html';
   } catch (err) {
@@ -71,6 +62,35 @@ form.addEventListener('submit', async (e) => {
     btnLoading.classList.add('hidden');
     loginBtn.disabled = false;
   }
+}
+
+// Clear legacy localStorage key if present
+localStorage.removeItem('preventAutoLogin');
+
+// Pre-fill credentials if stored
+const rememberedUsername = localStorage.getItem('rememberedUsername');
+const rememberedPassword = localStorage.getItem('rememberedPassword');
+const preventAutoLogin   = sessionStorage.getItem('preventAutoLogin');
+
+if (rememberedUsername) {
+  document.getElementById('username').value = rememberedUsername;
+  rememberMeCh.checked = true;
+}
+if (rememberedPassword) {
+  pwInput.value = rememberedPassword;
+}
+
+// Trigger auto-login if remembered and not explicitly logged out in this session
+if (rememberedUsername && rememberedPassword && preventAutoLogin !== 'true') {
+  doLogin(rememberedUsername, rememberedPassword);
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  sessionStorage.removeItem('preventAutoLogin');
+  const username = document.getElementById('username').value.trim();
+  const password = pwInput.value;
+  await doLogin(username, password);
 });
 
 // ─── Particle Background ──────────────────────────────────────────

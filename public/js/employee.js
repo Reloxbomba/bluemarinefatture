@@ -1,5 +1,59 @@
 'use strict';
 
+// ─── Fetch Interceptor & Silent Re-auth ───────────────────────────
+const originalFetch = window.fetch;
+let silentLoginPromise = null;
+
+async function performSilentLogin(username, password) {
+  if (silentLoginPromise) return silentLoginPromise;
+  
+  silentLoginPromise = (async () => {
+    try {
+      const loginRes = await originalFetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      if (loginRes.ok) {
+        return true;
+      }
+    } catch (err) {
+      console.error('Silent re-auth failed:', err);
+    } finally {
+      silentLoginPromise = null;
+    }
+    return false;
+  })();
+  
+  return silentLoginPromise;
+}
+
+window.fetch = async function(url, options = {}) {
+  let res = await originalFetch(url, options);
+  const urlStr = typeof url === 'string' ? url : (url.url || '');
+  
+  // Intercept 401 response (excluding login/logout calls)
+  if (res.status === 401 && !urlStr.includes('/api/auth/login') && !urlStr.includes('/api/auth/logout')) {
+    const username = localStorage.getItem('rememberedUsername');
+    const password = localStorage.getItem('rememberedPassword');
+    
+    if (username && password) {
+      const loginSuccess = await performSilentLogin(username, password);
+      if (loginSuccess) {
+        // Retry the original request
+        res = await originalFetch(url, options);
+        return res;
+      }
+    }
+    
+    // If no credentials or login failed, redirect to login page
+    window.location.href = '/';
+    throw new Error('Sessione scaduta. Reindirizzamento in corso...');
+  }
+  
+  return res;
+};
+
 // ─── Product catalog (loaded dynamically) ────────────────────────
 let PRODUCTS = {};
 
@@ -344,6 +398,7 @@ invoiceForm.addEventListener('submit', async (e) => {
 
 // ─── Logout ───────────────────────────────────────────────────────
 document.getElementById('logout-btn').addEventListener('click', async () => {
+  sessionStorage.setItem('preventAutoLogin', 'true');
   await fetch('/api/auth/logout', { method: 'POST' });
   window.location.href = '/';
 });
